@@ -2,14 +2,21 @@ import { IncomingMessage, ServerResponse } from 'http';
 import * as simpleIcons from 'simple-icons';
 import url from 'url';
 
-const ALL_ICONS = Object.values(simpleIcons)
-  .filter((icon: any) => icon && typeof icon === 'object' && 'title' in icon && 'slug' in icon)
-  .map((icon: any) => ({
-    title: icon.title as string,
-    slug: icon.slug as string,
-    hex: icon.hex as string,
-    path: icon.path as string,
-  }));
+let _allIcons: { title: string; slug: string; hex: string; path: string }[] | null = null;
+
+function getAllIcons() {
+  if (_allIcons) return _allIcons;
+  _allIcons = Object.values(simpleIcons as Record<string, unknown>)
+    .filter((icon): icon is { title: string; slug: string; hex: string; path: string } =>
+      !!icon && typeof icon === 'object' && 'title' in icon && 'slug' in icon)
+    .map((icon) => ({
+      title: icon.title,
+      slug: icon.slug,
+      hex: icon.hex,
+      path: icon.path,
+    }));
+  return _allIcons;
+}
 
 function fuzzyScore(query: string, text: string): number {
   const q = query.toLowerCase();
@@ -26,7 +33,7 @@ function fuzzyScore(query: string, text: string): number {
 }
 
 function searchIcons(query: string, limit: number) {
-  return ALL_ICONS
+  return getAllIcons()
     .map(icon => ({
       title: icon.title,
       slug: icon.slug,
@@ -40,7 +47,7 @@ function searchIcons(query: string, limit: number) {
 
 function findIcon(slug: string) {
   const clean = slug.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return ALL_ICONS.find(icon => icon.slug.toLowerCase() === clean);
+  return getAllIcons().find(icon => icon.slug.toLowerCase() === clean);
 }
 
 function parseColor(param: string | string[] | undefined, defaultHex: string): string {
@@ -88,6 +95,19 @@ function getParam(val: string | string[] | undefined, fallback = ''): string {
 }
 
 export async function handleApiRequest(req: IncomingMessage, res: ServerResponse) {
+  try {
+    return await _handleApiRequest(req, res);
+  } catch (err) {
+    console.error('[api] unhandled error:', err);
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'Internal server error', message: String(err) }));
+    }
+  }
+}
+
+async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -126,13 +146,13 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=3600');
-    res.end(JSON.stringify(ALL_ICONS));
+    res.end(JSON.stringify(getAllIcons()));
     return;
   }
 
   // GET /api/icons — lightweight list, optional ?page=&limit=
   if (query.action === 'icons' || pathname === '/api/icons') {
-    const list = ALL_ICONS.map(({ title, slug, hex }) => ({ title, slug, hex }));
+    const list = getAllIcons().map(({ title, slug, hex }) => ({ title, slug, hex }));
     const limit = parseInt(getParam(query.limit, '0'), 10) || 0;
 
     res.statusCode = 200;
