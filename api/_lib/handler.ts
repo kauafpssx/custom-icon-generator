@@ -1,19 +1,21 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import * as simpleIcons from 'simple-icons';
 import url from 'url';
 
-let _allIcons: { title: string; slug: string; hex: string; path: string }[] | null = null;
+type Icon = { title: string; slug: string; hex: string; path: string };
 
-function getAllIcons() {
+let _allIcons: Icon[] | null = null;
+
+async function getAllIcons(): Promise<Icon[]> {
   if (_allIcons) return _allIcons;
-  _allIcons = Object.values(simpleIcons as Record<string, unknown>)
-    .filter((icon): icon is { title: string; slug: string; hex: string; path: string } =>
-      !!icon && typeof icon === 'object' && 'title' in icon && 'slug' in icon)
+  const mod = await import('simple-icons') as Record<string, unknown>;
+  _allIcons = Object.values(mod)
+    .filter((icon): icon is Icon =>
+      !!icon && typeof icon === 'object' && 'title' in icon && 'slug' in icon && 'hex' in icon && 'path' in icon)
     .map((icon) => ({
-      title: icon.title,
-      slug: icon.slug,
-      hex: icon.hex,
-      path: icon.path,
+      title: icon.title as string,
+      slug: icon.slug as string,
+      hex: icon.hex as string,
+      path: icon.path as string,
     }));
   return _allIcons;
 }
@@ -32,8 +34,8 @@ function fuzzyScore(query: string, text: string): number {
   return 0;
 }
 
-function searchIcons(query: string, limit: number) {
-  return getAllIcons()
+async function searchIcons(query: string, limit: number) {
+  return (await getAllIcons())
     .map(icon => ({
       title: icon.title,
       slug: icon.slug,
@@ -45,9 +47,9 @@ function searchIcons(query: string, limit: number) {
     .slice(0, limit);
 }
 
-function findIcon(slug: string) {
+async function findIcon(slug: string): Promise<Icon | undefined> {
   const clean = slug.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return getAllIcons().find(icon => icon.slug.toLowerCase() === clean);
+  return (await getAllIcons()).find(icon => icon.slug.toLowerCase() === clean);
 }
 
 function parseColor(param: string | string[] | undefined, defaultHex: string): string {
@@ -137,7 +139,7 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-    res.end(JSON.stringify(searchIcons(q, limit)));
+    res.end(JSON.stringify(await searchIcons(q, limit)));
     return;
   }
 
@@ -146,13 +148,13 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=3600');
-    res.end(JSON.stringify(getAllIcons()));
+    res.end(JSON.stringify(await getAllIcons()));
     return;
   }
 
   // GET /api/icons — lightweight list, optional ?page=&limit=
   if (query.action === 'icons' || pathname === '/api/icons') {
-    const list = getAllIcons().map(({ title, slug, hex }) => ({ title, slug, hex }));
+    const list = (await getAllIcons()).map(({ title, slug, hex }) => ({ title, slug, hex }));
     const limit = parseInt(getParam(query.limit, '0'), 10) || 0;
 
     res.statusCode = 200;
@@ -193,7 +195,7 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     else if (slugParam.endsWith('.ico'))  { format = 'ico';  cleanSlug = slugParam.slice(0, -4); }
     else if (slugParam.endsWith('.json')) { format = 'json'; cleanSlug = slugParam.slice(0, -5); }
 
-    const icon = findIcon(cleanSlug);
+    const icon = await findIcon(cleanSlug);
 
     if (!icon) {
       res.statusCode = 404;
@@ -267,4 +269,3 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify({ error: 'Not found. Visit /playground for documentation.' }));
 }
-

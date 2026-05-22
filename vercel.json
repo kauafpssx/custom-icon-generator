@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "node_modules/@resvg/resvg-js/**"
+      "includeFiles": "node_modules/{@resvg/resvg-js,simple-icons}/**"
     }
   },
   "rewrites": [
@@ -21,6 +21,10 @@
     {
       "source": "/api/icons",
       "destination": "/api/index?action=icons"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
   ]
 }
