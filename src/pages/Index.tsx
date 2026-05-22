@@ -5,7 +5,7 @@ import * as allSimpleIcons from 'simple-icons';
 import type { SimpleIcon } from 'simple-icons';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Bookmark, Search, Shuffle, Settings, X } from "lucide-react";
+import { Bookmark, Search, Shuffle, Settings, X, Code } from "lucide-react";
 import { ColorPicker } from "@/components/ColorPicker";
 import { Button } from "@/components/ui/button";
 import { BatchDownloaderSheet } from "@/components/BatchDownloaderSheet";
@@ -185,7 +185,15 @@ const Index = () => {
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <header className="text-center mb-8">
+      <header className="text-center mb-8 relative flex flex-col items-center">
+        <div className="md:absolute md:right-0 md:top-0 mb-4 md:mb-0">
+          <Button variant="outline" size="sm" asChild className="gap-2 border-border hover:bg-accent hover:text-accent-foreground">
+            <a href="/playground" className="flex items-center gap-2">
+              <Code className="h-4 w-4" />
+              API System
+            </a>
+          </Button>
+        </div>
         <h1 className="text-4xl font-bold tracking-tight">Custom Icon Generator</h1>
         <p className="text-muted-foreground mt-2">
           Search, select, customize, and download icons in the format you need.

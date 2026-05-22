@@ -2,8 +2,20 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": "/icons/$1"
+      "source": "/api/asset/:slug",
+      "destination": "/api/index?slug=:slug"
+    },
+    {
+      "source": "/api/search",
+      "destination": "/api/index?action=search"
+    },
+    {
+      "source": "/api/icons/all",
+      "destination": "/api/index?action=icons-all"
+    },
+    {
+      "source": "/api/icons",
+      "destination": "/api/index?action=icons"
     }
   ]
 }

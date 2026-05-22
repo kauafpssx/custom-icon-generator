@@ -10,6 +10,25 @@ export default defineConfig(() => ({
     port: 8080,
   },
   plugins: [
+    {
+      name: 'api-middleware',
+      configureServer(server) {
+        server.middlewares.use(async (req, res, next) => {
+          if (req.url && (req.url.startsWith('/api') || req.url.startsWith('/api/'))) {
+            try {
+              const { handleApiRequest } = await import('./api/_lib/handler');
+              handleApiRequest(req, res);
+            } catch (err) {
+              console.error('API Error:', err);
+              res.statusCode = 500;
+              res.end(JSON.stringify({ error: 'API Error' }));
+            }
+          } else {
+            next();
+          }
+        });
+      }
+    },
     dyadComponentTagger(),
     react(),
     VitePWA({
