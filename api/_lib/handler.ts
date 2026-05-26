@@ -186,6 +186,10 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     const color   = parseColor(query.color, icon.hex);
     const sizeVal = parseSize(query.size);
 
+    if (typeof query.color === 'string' && query.color.toLowerCase() === 'random') {
+      res.setHeader('X-Color', color.replace('#', ''));
+    }
+
     if (format === 'svg') {
       res.statusCode = 200;
       res.setHeader('Content-Type', 'image/svg+xml');
@@ -253,6 +257,8 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
 
     const color   = parseColor(query.color, icon.hex);
     const sizeVal = parseSize(query.size);
+
+    if (isRandomColor) res.setHeader('X-Color', color.replace('#', ''));
 
     if (format === 'svg') {
       res.statusCode = 200;

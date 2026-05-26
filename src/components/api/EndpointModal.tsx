@@ -214,9 +214,14 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '', onAfterExe
         });
       } else {
         const blob = await res.blob();
+        let displayUrl = reqUrl;
+        const xColor = res.headers.get('X-Color');
+        if (xColor) {
+          displayUrl = reqUrl.replace(/color=random/gi, `color=${xColor}`);
+        }
         setResponse({
           status: res.status, statusText: res.statusText, elapsed, contentType: ct,
-          imageUrl: URL.createObjectURL(blob), requestUrl: reqUrl,
+          imageUrl: URL.createObjectURL(blob), requestUrl: displayUrl,
           size: blob.size, rateLimit,
         });
       }
