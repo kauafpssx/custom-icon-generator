@@ -11,8 +11,6 @@ The **Custom Icon Generator** is a fast, responsive web application designed to 
 
 ## 🌟 Core Features
 
-This tool is packed with functionalities to streamline your icon workflow:
-
 | # | Feature | Description |
 | :---: | :--- | :--- |
 | 🎨 | **Dynamic Color Picker** | Instantly apply any hex color to all icons in real-time. |
@@ -22,57 +20,56 @@ This tool is packed with functionalities to streamline your icon workflow:
 | 📦 | **Batch Download** | Select multiple icons and download them all efficiently in a single ZIP file. |
 | 💻 | **SVG Code Viewer** | Inspect, copy, and download the colored SVG code directly. |
 | 📱 | **Responsive Design** | A seamless and intuitive experience across desktop and mobile devices. |
+| 🔌 | **Public REST API** | Programmatic access to icons — SVG, PNG, ICO, and JSON. |
 
 ---
 
-## 💡 Detailed Usage Guide
+## 🔌 REST API
 
-The application's interface is designed for maximum efficiency.
+Full documentation lives at `/api` on the deployed site. All endpoints accept `GET` requests and return JSON or image data.
 
-### 1. Finding Your Icon 🔎
+### Endpoints
 
-Use the search bar at the top to filter the extensive library.
+| Method | Path | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/search?q=github` | Fuzzy search icons by name or slug |
+| `GET` | `/api/icons` | Lightweight list `{title, slug, hex}[]` — supports `?page=&limit=` |
+| `GET` | `/api/icons/all` | Full dataset including SVG path data |
+| `GET` | `/api/asset/{slug}.svg` | Colored SVG — `?color=brand\|hex&size=16-512` |
+| `GET` | `/api/asset/{slug}.png` | Rasterized PNG — `?color=brand\|hex&size=16-512` |
+| `GET` | `/api/asset/{slug}.ico` | ICO format — `?color=brand\|hex&size=16-512` |
+| `GET` | `/api/asset/{slug}.json` | Icon metadata + pre-built SVG string |
 
-*   **Search:** Type the brand name (e.g., "GitHub") or slug (e.g., "github").
-*   **Sorting:** Use the toggle group to sort results by **A-Z** 🔠, **Z-A** 🔤, or **Random** 🎲 order.
+**Import collection:** click **"Import collection"** on the `/api` page to download a pre-configured **Postman** or **Insomnia** file — the base URL is injected automatically from the current deployment.
 
-### 2. Customizing the Color 🌈
+---
 
-The color controls are central to the customization process.
+## 🛡️ Rate Limiting
 
-*   **Color Picker:** Click the main color swatch 🎨 to open the hex color picker and select your desired shade.
-*   **Randomize:** Hit the **Shuffle** button 🔀 to apply a random color instantly.
-*   **Saving Colors:** Click the **Bookmark** button 🔖 to save the current color to your recent list.
-*   **Recent Colors:** Click on any saved color swatch to reuse it, or click the small **X** ❌ to remove it from the list.
+All API routes are rate-limited using a **sliding window** algorithm backed by [Upstash Redis](https://upstash.com). Three tiers are available:
 
-### 3. Setting Resolution 📐
+| Tier | Limit | How to activate |
+| :--- | :--- | :--- |
+| **Anonymous** | 30 req / min · per IP | No key needed |
+| **Basic** | 200 req / min · per key | `X-API-Key: <key>` header |
+| **Master** | Unlimited | `X-API-Key: <key>` header |
 
-For raster formats (PNG and ICO), you can define the output size.
+Every response includes rate limit headers:
 
-*   Click the resolution button (e.g., **256x256** 🖼️) to open the configuration dialog.
-*   Choose a predefined size or enter a custom value up to 4096px.
+```
+X-RateLimit-Limit: 30
+X-RateLimit-Remaining: 27
+X-RateLimit-Reset: 1718000000
+X-RateLimit-Tier: anonymous
+```
 
-### 4. Downloading Icons ⬇️
+When the limit is exceeded the API returns `429 Too Many Requests` with a `Retry-After` header.
 
-#### A. Individual Download (Icon Card)
-Each icon card provides quick download buttons:
-*   **SVG:** Downloads the pure vector file, colored with the selected hex code.
-*   **PNG:** Downloads a raster image at the configured resolution.
-*   **ICO:** Downloads a Windows icon file containing multiple standard resolutions (16, 32, 48, 64px), generated at the configured color.
-
-#### B. Batch Download (ZIP Archive)
-1.  **Selection:** Use the checkbox ✅ on the top right of each icon card to select it.
-2.  **Batch Sheet:** A floating button appears when 2+ icons are selected. Click it to open the batch panel 📦.
-3.  **Download:** Choose your desired format (SVG, PNG, or ICO) and download them all efficiently in a single ZIP file 💾.
+Unrecognized API keys silently fall back to the anonymous tier — the API never reveals whether a key exists.
 
 ---
 
 ## ⚙️ Technical Architecture
-
-This application is a modern, client-side React application focused on performance and smooth user experience, leveraging powerful libraries for icon handling and conversion.
-
-### Icon Source Information
-We use the official Simple Icons library.
 
 ### Core Technologies
 
@@ -135,17 +132,16 @@ We use the official Simple Icons library.
 
 ## 👨‍💻 Development Setup
 
-To run this project locally for development, follow these steps:
+### Prerequisites
 
-### 📦 Prerequisites
+Node.js v18+ and pnpm installed.
 
-Ensure you have Node.js (v18+) and pnpm installed on your system.
-
-### 📝 Steps to Run
+### Steps
 
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/zKauaFerreira/custom-icon-generator.git
+   cd custom-icon-generator
    ```
 
 2. **Install dependencies:**
@@ -153,21 +149,77 @@ Ensure you have Node.js (v18+) and pnpm installed on your system.
    pnpm install
    ```
 
-3. **Start the development server:**
+3. **Configure environment variables:**
    ```bash
-   pnpm run dev
+   cp .env.example .env.local
+   # Fill in UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
+   # (leave blank for local dev — rate limiting runs in fail-open mode)
    ```
 
-The application will be available at `http://localhost:8080`. Happy coding! 🚀
+4. **Start the development server:**
+   ```bash
+   pnpm dev
+   ```
+
+   Available at `http://localhost:8080`.
+
+---
+
+## 🚀 Deploying to Vercel
+
+1. Import the repository in the Vercel dashboard.
+2. Set the following environment variables in **Project → Settings → Environment Variables**:
+
+   | Variable | Value |
+   | :--- | :--- |
+   | `UPSTASH_REDIS_REST_URL` | From [Upstash console](https://console.upstash.com) |
+   | `UPSTASH_REDIS_REST_TOKEN` | From [Upstash console](https://console.upstash.com) |
+   | `API_KEYS_BASIC` | Comma-separated basic-tier keys |
+   | `API_KEYS_MASTER` | Comma-separated master-tier keys |
+
+3. Deploy. The `api/index.ts` serverless function is auto-detected.
+
+### Generating new API keys
+
+```bash
+node -e "const {randomBytes}=require('crypto'); console.log(randomBytes(32).toString('hex'))"
+```
+
+Run once per key. Add the output to `API_KEYS_BASIC` or `API_KEYS_MASTER` (comma-separated).
+
+---
+
+## 💡 Detailed Usage Guide
+
+### Finding Your Icon 🔎
+
+Use the search bar at the top to filter the library.
+
+- **Search:** Type the brand name (e.g., "GitHub") or slug (e.g., "github").
+- **Sorting:** Toggle between **A-Z**, **Z-A**, or **Random** order.
+
+### Customizing the Color 🌈
+
+- **Color Picker:** Click the main color swatch to open the hex picker.
+- **Randomize:** Hit the **Shuffle** button for a random color.
+- **Saving Colors:** Click **Bookmark** to save the current color to your recent list.
+
+### Setting Resolution 📐
+
+Click the resolution button (e.g., **256x256**) to open the configuration dialog. Choose a preset or enter a custom value up to 4096px.
+
+### Downloading Icons ⬇️
+
+**Individual:** Each icon card has direct SVG / PNG / ICO download buttons.
+
+**Batch:** Select 2+ icons with the card checkboxes, then open the batch panel to download all as a ZIP.
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions! If you find a bug or have a suggestion for a new feature, please feel free to:
-
-1.  Open an **Issue** 🐛 to report bugs or propose enhancements.
-2.  Submit a **Pull Request** ⬆️ with your code changes.
+1. Open an **Issue** to report bugs or propose enhancements.
+2. Submit a **Pull Request** with your changes.
 
 ---
 

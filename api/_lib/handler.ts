@@ -1,5 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import url from 'url';
+import { checkRateLimit, applyRateLimitHeaders } from './ratelimit.js';
 
 type Icon = { title: string; slug: string; hex: string; path: string };
 
@@ -96,6 +97,24 @@ function getParam(val: string | string[] | undefined, fallback = ''): string {
   return (Array.isArray(val) ? val[0] : val) ?? fallback;
 }
 
+function setCors(res: ServerResponse): void {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key');
+  res.setHeader('Access-Control-Expose-Headers',
+    'X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-RateLimit-Tier, Retry-After');
+}
+
+function send429(res: ServerResponse, retryAfter: number): void {
+  res.statusCode = 429;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify({
+    error: 'Rate limit exceeded',
+    message: `Too many requests. Retry after ${retryAfter}s. Use an API key for higher limits.`,
+    retryAfter,
+  }));
+}
+
 export async function handleApiRequest(req: IncomingMessage, res: ServerResponse) {
   try {
     return await _handleApiRequest(req, res);
@@ -110,13 +129,27 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
 }
 
 async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  setCors(res);
 
   if (req.method === 'OPTIONS') {
     res.statusCode = 200;
     res.end();
+    return;
+  }
+
+  // Rate limiting — applied before any work is done.
+  // Wrapped defensively: a crash here must never take down the API.
+  let rl: Awaited<ReturnType<typeof checkRateLimit>>;
+  try {
+    rl = await checkRateLimit(req);
+  } catch (err) {
+    console.error('[api] checkRateLimit threw unexpectedly:', err);
+    rl = { allowed: true, tier: 'anonymous', limit: -1, remaining: -1, reset: 0 };
+  }
+  applyRateLimitHeaders(res, rl);
+
+  if (!rl.allowed) {
+    send429(res, rl.retryAfter ?? 60);
     return;
   }
 

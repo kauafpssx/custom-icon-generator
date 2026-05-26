@@ -9,13 +9,20 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ColorPicker } from '@/components/ColorPicker';
-import { Copy, Play } from 'lucide-react';
+import { Copy, Play, Key } from 'lucide-react';
 import type { ApiEndpoint } from '@/lib/api-endpoints';
 
 interface IconSuggestion {
   s: string;
   t: string;
   c: string;
+}
+
+interface RateLimitInfo {
+  tier: string;
+  limit: number | null;
+  remaining: number | null;
+  reset: number | null;
 }
 
 interface ResponseState {
@@ -30,6 +37,7 @@ interface ResponseState {
   truncated?: boolean;
   totalItems?: number;
   error?: string;
+  rateLimit?: RateLimitInfo | null;
 }
 
 type ImageTab = 'preview' | 'markdown' | 'html' | 'css' | 'url';
@@ -77,13 +85,66 @@ function fmtBytes(n: number): string {
   return `${(n / 1_048_576).toFixed(1)}MB`;
 }
 
+function RateLimitBar({ rl }: { rl: RateLimitInfo }) {
+  const isUnlimited = rl.tier === 'master';
+  // null remaining (Redis down) → show full bar with dashed style to indicate uncertainty
+  const pct = rl.limit !== null && rl.limit > 0
+    ? rl.remaining !== null
+      ? (rl.remaining / rl.limit) * 100
+      : 100  // unknown remaining → render full bar, opacity will indicate uncertainty
+    : null;
+  const unknownRemaining = rl.remaining === null && rl.limit !== null;
+
+  const barColor = pct === null || isUnlimited
+    ? 'bg-violet-500'
+    : pct > 50 ? 'bg-emerald-500'
+    : pct > 10 ? 'bg-amber-500'
+    : 'bg-red-500';
+
+  const labelColor = pct === null || isUnlimited
+    ? 'text-violet-400'
+    : pct > 50 ? 'text-emerald-400'
+    : pct > 10 ? 'text-amber-400'
+    : 'text-red-400';
+
+  return (
+    <div className="border rounded-lg px-3 py-2.5 bg-muted/20 flex flex-col gap-1.5">
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="flex items-center gap-1.5">
+          <Key className="h-3 w-3 text-muted-foreground" />
+          <span className="text-muted-foreground">Rate limit</span>
+          <span className={`font-mono font-semibold ${labelColor}`}>{rl.tier}</span>
+        </span>
+        <span className="font-mono text-muted-foreground">
+          {isUnlimited
+            ? '∞ unlimited'
+            : rl.limit !== null
+            ? rl.remaining !== null
+              ? `${rl.remaining} / ${rl.limit} remaining`
+              : `? / ${rl.limit} remaining`
+            : '—'}
+        </span>
+      </div>
+      {!isUnlimited && pct !== null && (
+        <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${barColor} ${unknownRemaining ? 'opacity-30' : ''}`}
+            style={{ width: `${Math.max(2, pct)}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface EndpointModalProps {
   endpoint: ApiEndpoint;
   open: boolean;
   onClose: () => void;
+  apiKey?: string;
 }
 
-export function EndpointModal({ endpoint, open, onClose }: EndpointModalProps) {
+export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: EndpointModalProps) {
   const [values, setValues] = useState<Record<string, string>>(() => {
     const defaults: Record<string, string> = {};
     for (const p of endpoint.params) {
@@ -100,7 +161,6 @@ export function EndpointModal({ endpoint, open, onClose }: EndpointModalProps) {
   const [imageTab, setImageTab] = useState<ImageTab>('preview');
   const fetchingRef = useRef(false);
 
-  // Hex of whichever icon slug is currently in the slug field
   const currentIconHex = useMemo(() => {
     const slugParam = endpoint.params.find((p) => p.isSlug);
     if (!slugParam || !icons.length) return null;
@@ -109,7 +169,6 @@ export function EndpointModal({ endpoint, open, onClose }: EndpointModalProps) {
     return icons.find((i) => i.s === slug)?.c ?? null;
   }, [icons, values, endpoint.params]);
 
-  // Pre-fetch icon list immediately when endpoint has a slug param
   useEffect(() => {
     if (endpoint.params.some((p) => p.isSlug)) fetchIcons();
   }, []);
@@ -151,6 +210,20 @@ export function EndpointModal({ endpoint, open, onClose }: EndpointModalProps) {
 
   const currentUrl = buildUrl(endpoint, values);
 
+  function extractRateLimit(res: Response): RateLimitInfo | null {
+    const tier = res.headers.get('x-ratelimit-tier');
+    if (!tier) return null; // headers absent — handler didn't run RL or crashed
+    const limit = res.headers.get('x-ratelimit-limit');
+    const remaining = res.headers.get('x-ratelimit-remaining');
+    const reset = res.headers.get('x-ratelimit-reset');
+    return {
+      tier,
+      limit: limit ? parseInt(limit) : null,
+      remaining: remaining ? parseInt(remaining) : null,
+      reset: reset ? parseInt(reset) : null,
+    };
+  }
+
   const execute = async () => {
     for (const p of endpoint.params) {
       if (p.required && !(values[p.name] ?? p.defaultValue)) return;
@@ -160,13 +233,17 @@ export function EndpointModal({ endpoint, open, onClose }: EndpointModalProps) {
     setResponse(null);
     setImageTab('preview');
 
+    const headers: HeadersInit = {};
+    if (apiKey.trim()) headers['X-API-Key'] = apiKey.trim();
+
     const t0 = Date.now();
     const reqUrl = currentUrl;
     try {
-      const res = await fetch(currentUrl);
+      const res = await fetch(currentUrl, { headers });
       const elapsed = Date.now() - t0;
       const ct = res.headers.get('content-type') ?? '';
       const clHeader = res.headers.get('content-length');
+      const rateLimit = extractRateLimit(res);
 
       if (ct.includes('json')) {
         const text = await res.text();
@@ -204,6 +281,7 @@ export function EndpointModal({ endpoint, open, onClose }: EndpointModalProps) {
           truncated,
           totalItems,
           size: clHeader ? parseInt(clHeader) : text.length,
+          rateLimit,
         });
       } else {
         const blob = await res.blob();
@@ -215,6 +293,7 @@ export function EndpointModal({ endpoint, open, onClose }: EndpointModalProps) {
           imageUrl: URL.createObjectURL(blob),
           requestUrl: reqUrl,
           size: blob.size,
+          rateLimit,
         });
       }
     } catch (err) {
@@ -236,6 +315,8 @@ export function EndpointModal({ endpoint, open, onClose }: EndpointModalProps) {
   const statusClass =
     response?.status && response.status >= 200 && response.status < 300
       ? 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30'
+      : response?.status === 429
+      ? 'bg-orange-500/15 text-orange-500 border-orange-500/30'
       : response?.status === 0
       ? 'bg-red-500/15 text-red-500 border-red-500/30'
       : 'bg-orange-500/15 text-orange-500 border-orange-500/30';
@@ -253,6 +334,11 @@ export function EndpointModal({ endpoint, open, onClose }: EndpointModalProps) {
               GET
             </span>
             <code className="font-mono text-sm">{endpoint.path}</code>
+            {apiKey && (
+              <span className="ml-auto flex items-center gap-1 text-[10px] font-mono text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">
+                <Key className="h-2.5 w-2.5" /> key active
+              </span>
+            )}
           </DialogTitle>
           <DialogDescription>{endpoint.desc}</DialogDescription>
         </DialogHeader>
@@ -388,6 +474,13 @@ export function EndpointModal({ endpoint, open, onClose }: EndpointModalProps) {
             <div className="bg-muted/50 border rounded-lg px-3 py-2 font-mono text-xs text-foreground overflow-x-auto whitespace-nowrap">
               {currentUrl}
             </div>
+            {apiKey && (
+              <div className="bg-muted/50 border rounded-lg px-3 py-2 font-mono text-xs text-muted-foreground flex items-center gap-2">
+                <Key className="h-3 w-3 shrink-0" />
+                <span className="text-muted-foreground">X-API-Key:</span>
+                <span className="text-foreground tracking-widest">{'•'.repeat(Math.min(apiKey.length, 20))}</span>
+              </div>
+            )}
           </div>
 
           {/* Execute */}
@@ -413,6 +506,9 @@ export function EndpointModal({ endpoint, open, onClose }: EndpointModalProps) {
                   {response.size ? ` · ${fmtBytes(response.size)}` : ''}
                 </span>
               </div>
+
+              {/* Rate limit bar */}
+              {response.rateLimit && <RateLimitBar rl={response.rateLimit} />}
 
               <div className="border rounded-xl overflow-hidden bg-background">
                 {response.error && (

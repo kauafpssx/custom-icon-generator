@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import dyadComponentTagger from "@dyad-sh/react-vite-component-tagger";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -13,6 +13,12 @@ export default defineConfig(() => ({
     {
       name: 'api-middleware',
       configureServer(server) {
+        // Load ALL vars from .env / .env.local into process.env for the API handler.
+        // Vite only exposes VITE_* vars by default; without this, API_KEYS_* and
+        // UPSTASH_* would be undefined inside handler.ts / ratelimit.ts.
+        const env = loadEnv(server.config.mode, process.cwd(), '');
+        Object.assign(process.env, env);
+
         server.middlewares.use(async (req, res, next) => {
           if (req.url && (req.url.startsWith('/api') || req.url.startsWith('/api/'))) {
             try {
