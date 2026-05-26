@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, Download, Key, Eye, EyeOff, X } from 'lucide-react';
 import { ENDPOINTS, API_TAGS, type ApiEndpoint } from '@/lib/api-endpoints';
 import { EndpointModal } from '@/components/api/EndpointModal';
 import { downloadCollection, type CollectionFormat } from '@/lib/api-collection';
+import { useRateLimit } from '@/hooks/use-rate-limit';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,15 +20,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 const LS_KEY = 'api_key';
-
-interface RateLimitStatus {
-  tier: string;
-  limit: number | null;
-  remaining: number | null;
-  reset: number | null;
-  loading: boolean;
-  error: boolean;
-}
 
 function tierColor(tier: string, remaining: number | null, limit: number | null) {
   if (tier === 'master') return 'text-violet-500';
@@ -48,62 +40,17 @@ function dotColor(tier: string, remaining: number | null, limit: number | null) 
 }
 
 export default function ApiPage() {
-  const [selected, setSelected] = useState<ApiEndpoint | null>(null);
-  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem(LS_KEY) ?? '');
-  const [showKey, setShowKey] = useState(false);
-  const [rlStatus, setRlStatus] = useState<RateLimitStatus>({
-    tier: 'anonymous', limit: 30, remaining: null, reset: null, loading: false, error: false,
-  });
-  const fetchingRl = useRef(false);
+  const [selected, setSelected]   = useState<ApiEndpoint | null>(null);
+  const [apiKey, setApiKey]       = useState<string>(() => localStorage.getItem(LS_KEY) ?? '');
+  const [showKey, setShowKey]     = useState(false);
 
-  const checkRateLimit = useCallback(async (key: string) => {
-    if (fetchingRl.current) return;
-    fetchingRl.current = true;
-    setRlStatus((s) => ({ ...s, loading: true, error: false }));
-
-    try {
-      const headers: HeadersInit = {};
-      if (key.trim()) headers['X-API-Key'] = key.trim();
-
-      const res = await fetch('/api/icons?limit=1', { headers });
-
-      const tier = res.headers.get('x-ratelimit-tier') ?? 'anonymous';
-      const limit = res.headers.get('x-ratelimit-limit');
-      const remaining = res.headers.get('x-ratelimit-remaining');
-      const reset = res.headers.get('x-ratelimit-reset');
-
-      setRlStatus({
-        tier,
-        limit: limit ? parseInt(limit) : null,
-        remaining: remaining ? parseInt(remaining) : null,
-        reset: reset ? parseInt(reset) : null,
-        loading: false,
-        error: false,
-      });
-    } catch {
-      setRlStatus((s) => ({ ...s, loading: false, error: true }));
-    } finally {
-      fetchingRl.current = false;
-    }
-  }, []);
-
-  // Check RL on mount and when key changes (debounced)
-  useEffect(() => {
-    const id = setTimeout(() => checkRateLimit(apiKey), 400);
-    return () => clearTimeout(id);
-  }, [apiKey, checkRateLimit]);
+  const { rlStatus, countdown, applyRlSnapshot, checkRateLimit } = useRateLimit(apiKey);
 
   const handleKeyChange = (val: string) => {
     setApiKey(val);
     if (val) localStorage.setItem(LS_KEY, val);
     else localStorage.removeItem(LS_KEY);
   };
-
-  const clearKey = () => handleKeyChange('');
-
-  function handleExport(format: CollectionFormat) {
-    downloadCollection(format);
-  }
 
   const { tier, limit, remaining } = rlStatus;
   const isUnlimited = tier === 'master';
@@ -130,7 +77,7 @@ export default function ApiPage() {
                   ? 'master · ∞'
                   : limit !== null
                   ? remaining !== null
-                    ? `${tier} · ${remaining}/${limit}`
+                    ? `${tier} · ${remaining}/${limit}${countdown !== null ? ` · ${countdown}s` : ''}`
                     : `${tier} · ?/${limit}`
                   : tier}
               </span>
@@ -173,15 +120,13 @@ export default function ApiPage() {
                         onClick={() => setShowKey((v) => !v)}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition"
                       >
-                        {showKey
-                          ? <EyeOff className="h-3.5 w-3.5" />
-                          : <Eye className="h-3.5 w-3.5" />}
+                        {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                       </button>
                     </div>
                     {apiKey && (
                       <button
                         type="button"
-                        onClick={clearKey}
+                        onClick={() => handleKeyChange('')}
                         className="text-muted-foreground hover:text-foreground transition"
                         title="Clear key"
                       >
@@ -208,6 +153,11 @@ export default function ApiPage() {
                               {remaining ?? '—'} / {limit} req/min remaining
                             </span>
                           )}
+                          {countdown !== null && (
+                            <span className="text-[11px] text-muted-foreground font-mono">
+                              resets in {countdown}s
+                            </span>
+                          )}
                         </div>
                         <button
                           onClick={() => checkRateLimit(apiKey)}
@@ -230,10 +180,10 @@ export default function ApiPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleExport('postman')}>
+                <DropdownMenuItem onClick={() => downloadCollection('postman' as CollectionFormat)}>
                   Postman collection
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport('insomnia')}>
+                <DropdownMenuItem onClick={() => downloadCollection('insomnia' as CollectionFormat)}>
                   Insomnia export
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -254,15 +204,11 @@ export default function ApiPage() {
         <section>
           <h1 className="text-2xl font-bold">API Reference</h1>
           <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
-            REST API for brand icons — SVG, PNG, and ICO formats. Click any endpoint to explore and
-            test it interactively.
+            REST API for brand icons — SVG, PNG, and ICO formats. Click any endpoint to explore and test it interactively.
           </p>
           <div className="flex gap-2 mt-3 flex-wrap">
             {(['CORS: *', 'Cache: up to 1yr', 'JSON / SVG / PNG / ICO', 'Rate limited'] as const).map((tag) => (
-              <span
-                key={tag}
-                className="text-[11px] px-2.5 py-1 rounded-full border text-muted-foreground font-mono"
-              >
+              <span key={tag} className="text-[11px] px-2.5 py-1 rounded-full border text-muted-foreground font-mono">
                 {tag}
               </span>
             ))}
@@ -312,9 +258,7 @@ export default function ApiPage() {
                       GET
                     </span>
                     <code className="font-mono text-sm shrink-0">{ep.path}</code>
-                    <span className="text-xs text-muted-foreground hidden sm:block truncate">
-                      {ep.summary}
-                    </span>
+                    <span className="text-xs text-muted-foreground hidden sm:block truncate">{ep.summary}</span>
                     <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto shrink-0" />
                   </button>
                 ))}
@@ -331,6 +275,7 @@ export default function ApiPage() {
           apiKey={apiKey}
           open={!!selected}
           onClose={() => setSelected(null)}
+          onAfterExecute={(rl) => { if (rl) applyRlSnapshot(rl); }}
         />
       )}
     </div>

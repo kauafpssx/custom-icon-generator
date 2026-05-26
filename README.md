@@ -1,128 +1,164 @@
-# ✨ Custom Icon Generator ✨
+# Custom Icon Generator
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Powered%20by-Simple%20Icons-blue?style=for-the-badge&logo=simple-icons&logoColor=white" alt="Simple Icons Badge">
-  <img src="https://img.shields.io/badge/Built%20with-React%20%26%20Tailwind-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React Badge">
+  <img src="https://custom-icon-generator.vercel.app/api/asset/react.svg?color=random&size=40" alt="React" width="40" height="40">
+  <img src="https://custom-icon-generator.vercel.app/api/asset/typescript.svg?color=random&size=40" alt="TypeScript" width="40" height="40">
+  <img src="https://custom-icon-generator.vercel.app/api/asset/tailwindcss.svg?color=random&size=40" alt="Tailwind CSS" width="40" height="40">
+  <img src="https://custom-icon-generator.vercel.app/api/asset/vite.svg?color=random&size=40" alt="Vite" width="40" height="40">
+  <img src="https://custom-icon-generator.vercel.app/api/asset/simpleicons.svg?color=random&size=40" alt="Simple Icons" width="40" height="40">
+  <img src="https://custom-icon-generator.vercel.app/api/asset/vercel.svg?color=random&size=40" alt="Vercel" width="40" height="40">
 </p>
 
-The **Custom Icon Generator** is a fast, responsive web application designed to empower developers and designers. It allows you to effortlessly search, customize, and download thousands of popular brand icons from the Simple Icons library in various formats (SVG, PNG, ICO) and any color you desire.
+Search, customize, and download thousands of brand icons in SVG, PNG, or ICO — and access them programmatically via a REST API.
 
 ---
 
-## 🌟 Core Features
+## Features
 
-| # | Feature | Description |
-| :---: | :--- | :--- |
-| 🎨 | **Dynamic Color Picker** | Instantly apply any hex color to all icons in real-time. |
-| 💾 | **Recent Colors** | Save and quickly reuse your favorite color palettes. |
-| 🔍 | **Powerful Search** | Filter through over 3000 icons by title or slug with smart sorting. |
-| 🖼️ | **Custom Resolution** | Configure raster downloads (PNG and ICO) up to a massive **4096x4096** pixels. |
-| 📦 | **Batch Download** | Select multiple icons and download them all efficiently in a single ZIP file. |
-| 💻 | **SVG Code Viewer** | Inspect, copy, and download the colored SVG code directly. |
-| 📱 | **Responsive Design** | A seamless and intuitive experience across desktop and mobile devices. |
-| 🔌 | **Public REST API** | Programmatic access to icons — SVG, PNG, ICO, and JSON. |
-
----
-
-## 🔌 REST API
-
-Full documentation lives at `/api` on the deployed site. All endpoints accept `GET` requests and return JSON or image data.
-
-### Endpoints
-
-| Method | Path | Description |
-| :--- | :--- | :--- |
-| `GET` | `/api/search?q=github` | Fuzzy search icons by name or slug |
-| `GET` | `/api/icons` | Lightweight list `{title, slug, hex}[]` — supports `?page=&limit=` |
-| `GET` | `/api/icons/all` | Full dataset including SVG path data |
-| `GET` | `/api/asset/{slug}.svg` | Colored SVG — `?color=brand\|hex&size=16-512` |
-| `GET` | `/api/asset/{slug}.png` | Rasterized PNG — `?color=brand\|hex&size=16-512` |
-| `GET` | `/api/asset/{slug}.ico` | ICO format — `?color=brand\|hex&size=16-512` |
-| `GET` | `/api/asset/{slug}.json` | Icon metadata + pre-built SVG string |
-
-**Import collection:** click **"Import collection"** on the `/api` page to download a pre-configured **Postman** or **Insomnia** file — the base URL is injected automatically from the current deployment.
+| Feature | Description |
+| :--- | :--- |
+| **Dynamic Color Picker** | Apply any hex color to icons in real-time |
+| **Recent Colors** | Save and reuse favorite palettes |
+| **Powerful Search** | Filter 3000+ icons by name or slug with smart sorting |
+| **Custom Resolution** | Configure PNG/ICO downloads up to 4096×4096px |
+| **Batch Download** | Select multiple icons, download as a single ZIP |
+| **SVG Code Viewer** | Inspect and copy colored SVG markup |
+| **API Playground** | Interactive docs at `/playground` — test every endpoint live |
+| **Public REST API** | Programmatic access: SVG, PNG, ICO, JSON |
 
 ---
 
-## 🛡️ Rate Limiting
+## REST API
 
-All API routes are rate-limited using a **sliding window** algorithm backed by [Upstash Redis](https://upstash.com). Three tiers are available:
+Full interactive docs at `/playground`. All endpoints are `GET`, CORS-enabled (`*`), and rate-limited.
 
-| Tier | Limit | How to activate |
-| :--- | :--- | :--- |
-| **Anonymous** | 30 req / min · per IP | No key needed |
-| **Basic** | 200 req / min · per key | `X-API-Key: <key>` header |
-| **Master** | Unlimited | `X-API-Key: <key>` header |
+### Icons
+
+| Path | Description |
+| :--- | :--- |
+| `GET /api/search?q=github` | Fuzzy search by name or slug. Optional `?limit=` (max 100). |
+| `GET /api/icons` | Lightweight list `[{title, slug, hex}]`. Optional `?page=&limit=`. |
+| `GET /api/icons/all` | Full dataset including SVG path data (~3 MB). Cached 24h. |
+| `GET /api/icons/{slug}` | Single icon metadata: title, slug, hex, path, svg, source, guidelines, license. |
+
+### Assets
+
+| Path | Description |
+| :--- | :--- |
+| `GET /api/asset/{slug}.svg` | Colored SVG. Supports `?color=` and `?size=`. |
+| `GET /api/asset/{slug}.png` | Rasterized PNG via resvg. Default 128×128px. |
+| `GET /api/asset/{slug}.ico` | ICO format (PNG-in-ICO). Ideal for favicons. Default 32×32px. |
+| `GET /api/asset/{slug}.json` | Icon metadata + pre-built SVG string. |
+
+### Random & Meta
+
+| Path | Description |
+| :--- | :--- |
+| `GET /api/random.svg` | Random icon as SVG. Never cached. Supports `?color=` and `?size=`. |
+| `GET /api/random.json` | Random icon as JSON with full metadata. Never cached. |
+| `GET /api/stats` | Total icon count, simple-icons version, formats, and rate limit tiers. |
+
+### Color and size parameters
+
+Both `?color=` and `?size=` accept special values:
+
+| Value | Behavior |
+| :--- | :--- |
+| `brand` | Use the icon's official brand color (default) |
+| `random` | Pick a random color / random size (16–512px) each request |
+| `#hex` or `hex` | Specific hex color, e.g. `FF0000` or `#FF0000` |
+| `16`–`512` | Pixel size for raster outputs |
+
+```
+# Random color, specific size
+GET /api/asset/github.svg?color=random&size=64
+
+# Brand color, random size
+GET /api/asset/react.png?color=brand&size=random
+
+# Custom color
+GET /api/asset/typescript.svg?color=3178c6
+```
+
+---
+
+## Rate Limiting
+
+Sliding-window algorithm backed by [Upstash Redis](https://upstash.com). Limits scale by endpoint cost.
+
+| Tier | How to activate | Metadata | SVG | PNG / ICO | Full dataset |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Anonymous** | No key (per IP) | 200 / min | 60 / min | 20 / min | 5 / min |
+| **Basic** | `X-API-Key: <key>` | 800 / min | 400 / min | 150 / min | 30 / min |
+| **Master** | `X-API-Key: <key>` | Unlimited | Unlimited | Unlimited | Unlimited |
 
 Every response includes rate limit headers:
 
 ```
-X-RateLimit-Limit: 30
-X-RateLimit-Remaining: 27
-X-RateLimit-Reset: 1718000000
 X-RateLimit-Tier: anonymous
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 57
+X-RateLimit-Reset: 1718000000
 ```
 
-When the limit is exceeded the API returns `429 Too Many Requests` with a `Retry-After` header.
+On `429 Too Many Requests`, a `Retry-After` header is included. Unrecognized keys silently fall back to anonymous — the API never reveals whether a key exists.
 
-Unrecognized API keys silently fall back to the anonymous tier — the API never reveals whether a key exists.
+**Import collection:** the `/playground` page has an **"Import collection"** button to download a pre-configured Postman or Insomnia file with all endpoints and the correct base URL.
 
 ---
 
-## ⚙️ Technical Architecture
-
-### Core Technologies
+## Tech Stack
 
 <table align="center">
   <tr>
-    <td align="center" width="180">
+    <td align="center" width="140">
       <a href="https://react.dev/">
-        <img src="./public/tech-icons/react.svg" alt="React" width="60" height="60">
-        <br>React
+        <img src="https://custom-icon-generator.vercel.app/api/asset/react.svg?color=random&size=48" alt="React" width="48" height="48">
+        <br>React 18
       </a>
     </td>
-    <td align="center" width="180">
+    <td align="center" width="140">
       <a href="https://www.typescriptlang.org/">
-        <img src="./public/tech-icons/typescript.svg" alt="TypeScript" width="60" height="60">
+        <img src="https://custom-icon-generator.vercel.app/api/asset/typescript.svg?color=random&size=48" alt="TypeScript" width="48" height="48">
         <br>TypeScript
       </a>
     </td>
-    <td align="center" width="180">
+    <td align="center" width="140">
       <a href="https://tailwindcss.com/">
-        <img src="./public/tech-icons/tailwindcss.svg" alt="Tailwind CSS" width="60" height="60">
+        <img src="https://custom-icon-generator.vercel.app/api/asset/tailwindcss.svg?color=random&size=48" alt="Tailwind CSS" width="48" height="48">
         <br>Tailwind CSS
       </a>
     </td>
-    <td align="center" width="180">
+    <td align="center" width="140">
       <a href="https://simpleicons.org/">
-        <img src="./public/tech-icons/simpleicons.svg" alt="Simple Icons" width="60" height="60">
+        <img src="https://custom-icon-generator.vercel.app/api/asset/simpleicons.svg?color=random&size=48" alt="Simple Icons" width="48" height="48">
         <br>Simple Icons
       </a>
     </td>
   </tr>
   <tr>
-    <td align="center" width="180">
-      <a href="https://canvg.github.io/">
-        <img src="./public/tech-icons/canvag.svg" alt="Canvg" width="60" height="60">
-        <br>Canvg (JS)
+    <td align="center" width="140">
+      <a href="https://vitejs.dev/">
+        <img src="https://custom-icon-generator.vercel.app/api/asset/vite.svg?color=random&size=48" alt="Vite" width="48" height="48">
+        <br>Vite + PWA
       </a>
     </td>
-    <td align="center" width="180">
-      <a href="https://lenis.studiofreight.com/">
-        <img src="./public/tech-icons/lenis.svg" alt="Lenis" width="60" height="60">
-        <br>Lenis (JS)
-      </a>
-    </td>
-    <td align="center" width="180">
+    <td align="center" width="140">
       <a href="https://ui.shadcn.com/">
-        <img src="./public/tech-icons/shadcnuisvg.svg" alt="Shadcn/ui" width="60" height="60">
+        <img src="./public/tech-icons/shadcnuisvg.svg" alt="Shadcn/ui" width="48" height="48">
         <br>Shadcn/ui
       </a>
     </td>
-    <td align="center" width="180">
-      <a href="https://vitejs.dev/">
-        <img src="./public/tech-icons/vite.svg" alt="Vite" width="60" height="60">
-        <br>Vite
+    <td align="center" width="140">
+      <a href="https://vercel.com/">
+        <img src="https://custom-icon-generator.vercel.app/api/asset/vercel.svg?color=random&size=48" alt="Vercel" width="48" height="48">
+        <br>Vercel
+      </a>
+    </td>
+    <td align="center" width="140">
+      <a href="https://upstash.com/">
+        <img src="https://custom-icon-generator.vercel.app/api/asset/upstash.svg?color=random&size=48" alt="Upstash" width="48" height="48">
+        <br>Upstash Redis
       </a>
     </td>
   </tr>
@@ -130,45 +166,34 @@ Unrecognized API keys silently fall back to the anonymous tier — the API never
 
 ---
 
-## 👨‍💻 Development Setup
+## Development Setup
 
-### Prerequisites
+**Prerequisites:** Node.js v18+ and pnpm.
 
-Node.js v18+ and pnpm installed.
+```bash
+# 1. Clone
+git clone https://github.com/kauafpssx/custom-icon-generator.git
+cd custom-icon-generator
 
-### Steps
+# 2. Install
+pnpm install
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/zKauaFerreira/custom-icon-generator.git
-   cd custom-icon-generator
-   ```
+# 3. Configure environment
+cp .env.example .env.local
+# Fill in UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
+# Leave blank for local dev — rate limiting runs in-memory
 
-2. **Install dependencies:**
-   ```bash
-   pnpm install
-   ```
-
-3. **Configure environment variables:**
-   ```bash
-   cp .env.example .env.local
-   # Fill in UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
-   # (leave blank for local dev — rate limiting runs in fail-open mode)
-   ```
-
-4. **Start the development server:**
-   ```bash
-   pnpm dev
-   ```
-
-   Available at `http://localhost:8080`.
+# 4. Start dev server
+pnpm dev
+# → http://localhost:8080
+```
 
 ---
 
-## 🚀 Deploying to Vercel
+## Deploying to Vercel
 
 1. Import the repository in the Vercel dashboard.
-2. Set the following environment variables in **Project → Settings → Environment Variables**:
+2. Set environment variables under **Project → Settings → Environment Variables**:
 
    | Variable | Value |
    | :--- | :--- |
@@ -179,60 +204,37 @@ Node.js v18+ and pnpm installed.
 
 3. Deploy. The `api/index.ts` serverless function is auto-detected.
 
-### Generating new API keys
+**Generating API keys:**
 
 ```bash
 node -e "const {randomBytes}=require('crypto'); console.log(randomBytes(32).toString('hex'))"
 ```
 
-Run once per key. Add the output to `API_KEYS_BASIC` or `API_KEYS_MASTER` (comma-separated).
+Run once per key. Add to `API_KEYS_BASIC` or `API_KEYS_MASTER` (comma-separated).
 
 ---
 
-## 💡 Detailed Usage Guide
+## Usage Guide
 
-### Finding Your Icon 🔎
+**Search:** Type a brand name (e.g., `GitHub`) or slug (e.g., `github`) in the search bar. Toggle A-Z, Z-A, or Random sort.
 
-Use the search bar at the top to filter the library.
+**Color:** Click the color swatch to open the hex picker, hit Shuffle for a random color, or Bookmark to save it to your recent list.
 
-- **Search:** Type the brand name (e.g., "GitHub") or slug (e.g., "github").
-- **Sorting:** Toggle between **A-Z**, **Z-A**, or **Random** order.
+**Resolution:** Click the resolution button (e.g., `256x256`) to configure PNG/ICO size, up to 4096px.
 
-### Customizing the Color 🌈
+**Download:** Each icon card has SVG / PNG / ICO buttons. Select 2+ cards to enable the batch panel — downloads a ZIP.
 
-- **Color Picker:** Click the main color swatch to open the hex picker.
-- **Randomize:** Hit the **Shuffle** button for a random color.
-- **Saving Colors:** Click **Bookmark** to save the current color to your recent list.
-
-### Setting Resolution 📐
-
-Click the resolution button (e.g., **256x256**) to open the configuration dialog. Choose a preset or enter a custom value up to 4096px.
-
-### Downloading Icons ⬇️
-
-**Individual:** Each icon card has direct SVG / PNG / ICO download buttons.
-
-**Batch:** Select 2+ icons with the card checkboxes, then open the batch panel to download all as a ZIP.
+**API Playground:** Click **API System** or visit `/playground` to explore every endpoint interactively. Authorize with your API key to unlock higher rate limits.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 1. Open an **Issue** to report bugs or propose enhancements.
 2. Submit a **Pull Request** with your changes.
 
----
+## License
 
-## 📜 License
+MIT License — see [LICENSE](LICENSE) for details.
 
-This project is licensed under the MIT License.
-
-<p align="center">
-  <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge&logo=open-source-initiative" alt="MIT License">
-</p>
-
----
-
-<p align="center">
-  Made with 💙 by Kauã Ferreira.
-</p>
+<p align="center">Made with care by <a href="https://github.com/kauafpssx">Kauã Ferreira</a></p>

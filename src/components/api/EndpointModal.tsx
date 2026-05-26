@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,19 +11,12 @@ import { Input } from '@/components/ui/input';
 import { ColorPicker } from '@/components/ColorPicker';
 import { Copy, Play, Key } from 'lucide-react';
 import type { ApiEndpoint } from '@/lib/api-endpoints';
+import { RateLimitBar, type RateLimitInfo } from '@/components/api/RateLimitBar';
+import { useIconSuggestions } from '@/hooks/use-icon-suggestions';
+import { highlightJson } from '@/lib/json-highlight';
+import type { RlSnapshot } from '@/hooks/use-rate-limit';
 
-interface IconSuggestion {
-  s: string;
-  t: string;
-  c: string;
-}
-
-interface RateLimitInfo {
-  tier: string;
-  limit: number | null;
-  remaining: number | null;
-  reset: number | null;
-}
+export type { RlSnapshot };
 
 interface ResponseState {
   status: number;
@@ -63,78 +56,44 @@ function buildUrl(endpoint: ApiEndpoint, values: Record<string, string>): string
   return `${window.location.origin}${path}${qs.toString() ? '?' + qs.toString() : ''}`;
 }
 
-function highlightJson(json: string): string {
-  const escaped = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return escaped.replace(
-    /("(?:\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\btrue\b|\bfalse\b|\bnull\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
-    (match) => {
-      if (/^"/.test(match)) {
-        if (/:$/.test(match)) return `<span class="text-violet-400">${match}</span>`;
-        return `<span class="text-emerald-400">${match}</span>`;
-      }
-      if (/true|false/.test(match)) return `<span class="text-orange-400">${match}</span>`;
-      if (/null/.test(match)) return `<span class="text-slate-400">${match}</span>`;
-      return `<span class="text-cyan-400">${match}</span>`;
-    }
-  );
-}
-
 function fmtBytes(n: number): string {
   if (n < 1024) return `${n}B`;
   if (n < 1_048_576) return `${(n / 1024).toFixed(1)}KB`;
   return `${(n / 1_048_576).toFixed(1)}MB`;
 }
 
-function RateLimitBar({ rl }: { rl: RateLimitInfo }) {
-  const isUnlimited = rl.tier === 'master';
-  // null remaining (Redis down) → show full bar with dashed style to indicate uncertainty
-  const pct = rl.limit !== null && rl.limit > 0
-    ? rl.remaining !== null
-      ? (rl.remaining / rl.limit) * 100
-      : 100  // unknown remaining → render full bar, opacity will indicate uncertainty
-    : null;
-  const unknownRemaining = rl.remaining === null && rl.limit !== null;
+function renderDesc(desc: string, onToken: (token: string) => void): React.ReactNode {
+  const parts = desc.split(/("(?:[^"]+)")/g);
+  return parts.map((part, i) => {
+    const match = part.match(/^"([^"]+)"$/);
+    if (match) {
+      return (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onToken(match[1])}
+          className="font-mono text-[10px] bg-muted border rounded px-1 py-0.5 text-muted-foreground hover:text-foreground hover:bg-accent transition cursor-pointer"
+        >
+          {match[1]}
+        </button>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
 
-  const barColor = pct === null || isUnlimited
-    ? 'bg-violet-500'
-    : pct > 50 ? 'bg-emerald-500'
-    : pct > 10 ? 'bg-amber-500'
-    : 'bg-red-500';
-
-  const labelColor = pct === null || isUnlimited
-    ? 'text-violet-400'
-    : pct > 50 ? 'text-emerald-400'
-    : pct > 10 ? 'text-amber-400'
-    : 'text-red-400';
-
-  return (
-    <div className="border rounded-lg px-3 py-2.5 bg-muted/20 flex flex-col gap-1.5">
-      <div className="flex items-center justify-between text-[11px]">
-        <span className="flex items-center gap-1.5">
-          <Key className="h-3 w-3 text-muted-foreground" />
-          <span className="text-muted-foreground">Rate limit</span>
-          <span className={`font-mono font-semibold ${labelColor}`}>{rl.tier}</span>
-        </span>
-        <span className="font-mono text-muted-foreground">
-          {isUnlimited
-            ? '∞ unlimited'
-            : rl.limit !== null
-            ? rl.remaining !== null
-              ? `${rl.remaining} / ${rl.limit} remaining`
-              : `? / ${rl.limit} remaining`
-            : '—'}
-        </span>
-      </div>
-      {!isUnlimited && pct !== null && (
-        <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${barColor} ${unknownRemaining ? 'opacity-30' : ''}`}
-            style={{ width: `${Math.max(2, pct)}%` }}
-          />
-        </div>
-      )}
-    </div>
-  );
+function extractRateLimit(res: Response) {
+  const tier = res.headers.get('x-ratelimit-tier');
+  if (!tier) return null;
+  const limit     = res.headers.get('x-ratelimit-limit');
+  const remaining = res.headers.get('x-ratelimit-remaining');
+  const reset     = res.headers.get('x-ratelimit-reset');
+  return {
+    tier,
+    limit:     limit     ? parseInt(limit)     : null,
+    remaining: remaining ? parseInt(remaining) : null,
+    reset:     reset     ? parseInt(reset)     : null,
+  };
 }
 
 interface EndpointModalProps {
@@ -142,9 +101,10 @@ interface EndpointModalProps {
   open: boolean;
   onClose: () => void;
   apiKey?: string;
+  onAfterExecute?: (rl: RlSnapshot | null) => void;
 }
 
-export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: EndpointModalProps) {
+export function EndpointModal({ endpoint, open, onClose, apiKey = '', onAfterExecute }: EndpointModalProps) {
   const [values, setValues] = useState<Record<string, string>>(() => {
     const defaults: Record<string, string> = {};
     for (const p of endpoint.params) {
@@ -153,13 +113,12 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
     return defaults;
   });
 
-  const [icons, setIcons] = useState<IconSuggestion[]>([]);
-  const [suggestions, setSuggestions] = useState<IconSuggestion[]>([]);
-  const [activeSlugParam, setActiveSlugParam] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [response, setResponse] = useState<ResponseState | null>(null);
-  const [imageTab, setImageTab] = useState<ImageTab>('preview');
-  const fetchingRef = useRef(false);
+  const [loading, setLoading]     = useState(false);
+  const [response, setResponse]   = useState<ResponseState | null>(null);
+  const [imageTab, setImageTab]   = useState<ImageTab>('preview');
+
+  const { icons, suggestions, activeSlugParam, fetchIcons, updateQuery, clearSuggestions } =
+    useIconSuggestions({ apiKey });
 
   const currentIconHex = useMemo(() => {
     const slugParam = endpoint.params.find((p) => p.isSlug);
@@ -170,59 +129,33 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
   }, [icons, values, endpoint.params]);
 
   useEffect(() => {
-    if (endpoint.params.some((p) => p.isSlug)) fetchIcons();
-  }, []);
-
-  const fetchIcons = useCallback(async () => {
-    if (icons.length > 0 || fetchingRef.current) return;
-    fetchingRef.current = true;
-    try {
-      const res = await fetch('/api/icons');
-      const data: { title: string; slug: string; hex: string }[] = await res.json();
-      setIcons(data.map((i) => ({ s: i.slug, t: i.title, c: i.hex })));
-    } catch {
-      fetchingRef.current = false;
+    if (endpoint.params.some((p) => p.isSlug)) {
+      const slugParam = endpoint.params.find((p) => p.isSlug);
+      fetchIcons((list) => {
+        if (slugParam && list.length > 0) {
+          const pick = list[Math.floor(Math.random() * list.length)];
+          // Batch with setIcons (inside fetchIcons) — React 18 batches both into one render
+          setValues((prev) => ({ ...prev, [slugParam.name]: pick.s }));
+        }
+      });
     }
-  }, [icons.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setValue = (name: string, val: string) =>
     setValues((prev) => ({ ...prev, [name]: val }));
 
   const handleSlugInput = (paramName: string, q: string) => {
     setValue(paramName, q);
-    if (!q.trim()) {
-      setSuggestions([]);
-      return;
-    }
-    const ql = q.toLowerCase();
-    const hits = icons
-      .filter((i) => i.s.includes(ql) || i.t.toLowerCase().includes(ql))
-      .slice(0, 8);
-    setSuggestions(hits);
-    setActiveSlugParam(paramName);
+    updateQuery(paramName, q);
   };
 
   const pickSlug = (paramName: string, slug: string) => {
     setValue(paramName, slug);
-    setSuggestions([]);
-    setActiveSlugParam(null);
+    clearSuggestions();
   };
 
   const currentUrl = buildUrl(endpoint, values);
-
-  function extractRateLimit(res: Response): RateLimitInfo | null {
-    const tier = res.headers.get('x-ratelimit-tier');
-    if (!tier) return null; // headers absent — handler didn't run RL or crashed
-    const limit = res.headers.get('x-ratelimit-limit');
-    const remaining = res.headers.get('x-ratelimit-remaining');
-    const reset = res.headers.get('x-ratelimit-reset');
-    return {
-      tier,
-      limit: limit ? parseInt(limit) : null,
-      remaining: remaining ? parseInt(remaining) : null,
-      reset: reset ? parseInt(reset) : null,
-    };
-  }
 
   const execute = async () => {
     for (const p of endpoint.params) {
@@ -236,14 +169,17 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
     const headers: HeadersInit = {};
     if (apiKey.trim()) headers['X-API-Key'] = apiKey.trim();
 
-    const t0 = Date.now();
+    const t0   = Date.now();
     const reqUrl = currentUrl;
+    let rlFromResponse: RlSnapshot | null = null;
+
     try {
-      const res = await fetch(currentUrl, { headers });
+      const res     = await fetch(currentUrl, { headers, cache: 'no-store' });
       const elapsed = Date.now() - t0;
-      const ct = res.headers.get('content-type') ?? '';
+      const ct      = res.headers.get('content-type') ?? '';
       const clHeader = res.headers.get('content-length');
       const rateLimit = extractRateLimit(res);
+      rlFromResponse  = rateLimit;
 
       if (ct.includes('json')) {
         const text = await res.text();
@@ -267,49 +203,35 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
             truncated = true;
           }
         } else {
-          try {
-            body = JSON.stringify(JSON.parse(text), null, 2);
-          } catch {}
+          try { body = JSON.stringify(JSON.parse(text), null, 2); } catch {}
         }
 
         setResponse({
-          status: res.status,
-          statusText: res.statusText,
-          elapsed,
-          contentType: ct,
-          body,
-          truncated,
-          totalItems,
+          status: res.status, statusText: res.statusText, elapsed, contentType: ct,
+          body, truncated, totalItems,
           size: clHeader ? parseInt(clHeader) : text.length,
           rateLimit,
         });
       } else {
         const blob = await res.blob();
         setResponse({
-          status: res.status,
-          statusText: res.statusText,
-          elapsed,
-          contentType: ct,
-          imageUrl: URL.createObjectURL(blob),
-          requestUrl: reqUrl,
-          size: blob.size,
-          rateLimit,
+          status: res.status, statusText: res.statusText, elapsed, contentType: ct,
+          imageUrl: URL.createObjectURL(blob), requestUrl: reqUrl,
+          size: blob.size, rateLimit,
         });
       }
     } catch (err) {
       setResponse({
-        status: 0,
-        statusText: 'Network Error',
-        elapsed: Date.now() - t0,
-        contentType: '',
-        error: String(err),
+        status: 0, statusText: 'Network Error',
+        elapsed: Date.now() - t0, contentType: '', error: String(err),
       });
     } finally {
       setLoading(false);
+      onAfterExecute?.(rlFromResponse);
     }
   };
 
-  const copyUrl = () => navigator.clipboard.writeText(currentUrl);
+  const copyUrl  = () => navigator.clipboard.writeText(currentUrl);
   const copyBody = () => response?.body && navigator.clipboard.writeText(response.body);
 
   const statusClass =
@@ -346,42 +268,45 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
         {/* Scrollable body */}
         <div data-lenis-prevent style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <div className="px-5 py-5 flex flex-col gap-5">
+
           {/* Parameters */}
           {endpoint.params.length > 0 && (
             <div className="flex flex-col gap-2">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Parameters
-              </h3>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Parameters</h3>
               {endpoint.params.map((p) => (
                 <div key={p.name} className="border rounded-xl overflow-visible">
                   <div className="flex items-center gap-2 px-3 py-2 bg-muted/30 border-b">
                     <span className="font-mono text-sm font-medium">{p.name}</span>
                     {p.required ? (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-500 border border-rose-500/20 font-semibold">
-                        required
-                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-500 border border-rose-500/20 font-semibold">required</span>
                     ) : (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border font-medium">
-                        optional
-                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border font-medium">optional</span>
                     )}
-                    <span className="text-[11px] font-mono text-muted-foreground ml-auto">
-                      {p.loc}
-                    </span>
+                    <span className="text-[11px] font-mono text-muted-foreground ml-auto">{p.loc}</span>
                   </div>
                   <div className="px-3 py-2.5 flex flex-col gap-1.5">
-                    <p className="text-xs text-muted-foreground">{p.desc}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {renderDesc(p.desc, (token) => setValue(p.name, token))}
+                    </p>
 
                     {p.isColor ? (
                       <div className="flex items-center gap-2">
-                        <ColorPicker
-                          value={
-                            (!values[p.name] || values[p.name] === 'brand') && currentIconHex
-                              ? `#${currentIconHex}`
-                              : values[p.name] || '#000000'
-                          }
-                          onChange={(v) => setValue(p.name, v)}
-                        />
+                        {values[p.name]?.toLowerCase() === 'random' ? (
+                          <div
+                            className="h-10 w-10 rounded border-2 shrink-0"
+                            style={{ background: 'conic-gradient(in hsl longer hue, red 0%, red 100%)' }}
+                            title="Random color"
+                          />
+                        ) : (
+                          <ColorPicker
+                            value={
+                              (!values[p.name] || values[p.name] === 'brand') && currentIconHex
+                                ? `#${currentIconHex}`
+                                : values[p.name] || '#000000'
+                            }
+                            onChange={(v) => setValue(p.name, v)}
+                          />
+                        )}
                         <Input
                           value={values[p.name] ?? ''}
                           onChange={(e) => setValue(p.name, e.target.value)}
@@ -399,7 +324,7 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
                       </div>
                     ) : p.isSlug ? (
                       <div className="relative">
-                        {values[p.name] && (
+                        {values[p.name] && icons.some((i) => i.s === values[p.name]) && (
                           <img
                             src={`/api/asset/${values[p.name]}.svg${currentIconHex ? `?color=${currentIconHex}` : ''}`}
                             alt=""
@@ -414,12 +339,7 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
                             fetchIcons();
                             handleSlugInput(p.name, values[p.name] ?? '');
                           }}
-                          onBlur={() =>
-                            setTimeout(() => {
-                              setSuggestions([]);
-                              setActiveSlugParam(null);
-                            }, 150)
-                          }
+                          onBlur={() => setTimeout(() => clearSuggestions(), 150)}
                           placeholder={p.placeholder}
                           className={`font-mono text-sm${values[p.name] ? ' pl-8' : ''}`}
                         />
@@ -460,7 +380,7 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
             </div>
           )}
 
-          {/* URL Preview */}
+          {/* URL preview */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground font-mono">Request URL</span>
@@ -483,7 +403,7 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
             )}
           </div>
 
-          {/* Execute */}
+          {/* Execute button */}
           <Button onClick={execute} disabled={loading} className="w-full gap-2">
             <Play className="h-4 w-4" />
             {loading ? 'Executing…' : 'Execute'}
@@ -493,21 +413,15 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
           {response && (
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Response
-                </span>
-                <span
-                  className={`text-xs font-mono font-bold px-2 py-0.5 rounded border ${statusClass}`}
-                >
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Response</span>
+                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border ${statusClass}`}>
                   {response.status || 'ERR'} {response.statusText}
                 </span>
                 <span className="text-xs text-muted-foreground font-mono ml-auto">
-                  {response.elapsed}ms
-                  {response.size ? ` · ${fmtBytes(response.size)}` : ''}
+                  {response.elapsed}ms{response.size ? ` · ${fmtBytes(response.size)}` : ''}
                 </span>
               </div>
 
-              {/* Rate limit bar */}
               {response.rateLimit && <RateLimitBar rl={response.rateLimit} />}
 
               <div className="border rounded-xl overflow-hidden bg-background">
@@ -517,18 +431,18 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
 
                 {response.imageUrl && (() => {
                   const slug = values['slug'] ?? 'icon';
-                  const url = response.requestUrl ?? '';
+                  const url  = response.requestUrl ?? '';
                   const tabs: { id: ImageTab; label: string }[] = [
-                    { id: 'preview', label: 'Preview' },
+                    { id: 'preview',  label: 'Preview'  },
                     { id: 'markdown', label: 'Markdown' },
-                    { id: 'html', label: 'HTML' },
-                    { id: 'css', label: 'CSS' },
-                    { id: 'url', label: 'URL' },
+                    { id: 'html',     label: 'HTML'     },
+                    { id: 'css',      label: 'CSS'      },
+                    { id: 'url',      label: 'URL'      },
                   ];
                   const snippets: Record<Exclude<ImageTab, 'preview'>, string> = {
                     markdown: `![${slug}](${url})`,
-                    html: `<img src="${url}" alt="${slug}" />`,
-                    css: `background-image: url('${url}');`,
+                    html:     `<img src="${url}" alt="${slug}" />`,
+                    css:      `background-image: url('${url}');`,
                     url,
                   };
                   return (
@@ -578,9 +492,7 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
                 {response.body && (
                   <>
                     <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
-                      <span className="text-[11px] font-mono text-muted-foreground">
-                        {response.contentType}
-                      </span>
+                      <span className="text-[11px] font-mono text-muted-foreground">{response.contentType}</span>
                       <button
                         onClick={copyBody}
                         className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition"
@@ -589,9 +501,7 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
                       </button>
                     </div>
                     <pre data-lenis-prevent className="p-4 text-[11px] font-mono leading-relaxed overflow-auto max-h-72">
-                      <code
-                        dangerouslySetInnerHTML={{ __html: highlightJson(response.body) }}
-                      />
+                      <code dangerouslySetInnerHTML={{ __html: highlightJson(response.body) }} />
                     </pre>
                     {response.truncated && (
                       <p className="px-4 pb-3 text-[11px] text-muted-foreground">
@@ -606,6 +516,7 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '' }: Endpoint
               </div>
             </div>
           )}
+
         </div>
         </div>
       </DialogContent>

@@ -1,101 +1,9 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import url from 'url';
 import { checkRateLimit, applyRateLimitHeaders } from './ratelimit.js';
-
-type Icon = { title: string; slug: string; hex: string; path: string };
-
-let _allIcons: Icon[] | null = null;
-
-async function getAllIcons(): Promise<Icon[]> {
-  if (_allIcons) return _allIcons;
-  const mod = await import('simple-icons') as Record<string, unknown>;
-  _allIcons = Object.values(mod)
-    .filter((icon): icon is Icon =>
-      !!icon && typeof icon === 'object' && 'title' in icon && 'slug' in icon && 'hex' in icon && 'path' in icon)
-    .map((icon) => ({
-      title: icon.title as string,
-      slug: icon.slug as string,
-      hex: icon.hex as string,
-      path: icon.path as string,
-    }));
-  return _allIcons;
-}
-
-function fuzzyScore(query: string, text: string): number {
-  const q = query.toLowerCase();
-  const t = text.toLowerCase();
-  if (t === q) return 100;
-  if (t.startsWith(q)) return 80;
-  if (t.includes(q)) return 60;
-  let qi = 0;
-  for (let ti = 0; ti < t.length && qi < q.length; ti++) {
-    if (t[ti] === q[qi]) qi++;
-  }
-  if (qi === q.length) return Math.max(1, Math.floor(30 * q.length / t.length));
-  return 0;
-}
-
-async function searchIcons(query: string, limit: number) {
-  return (await getAllIcons())
-    .map(icon => ({
-      title: icon.title,
-      slug: icon.slug,
-      hex: icon.hex,
-      score: Math.max(fuzzyScore(query, icon.title), Math.floor(fuzzyScore(query, icon.slug) * 0.9)),
-    }))
-    .filter(icon => icon.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
-}
-
-async function findIcon(slug: string): Promise<Icon | undefined> {
-  const clean = slug.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return (await getAllIcons()).find(icon => icon.slug.toLowerCase() === clean);
-}
-
-function parseColor(param: string | string[] | undefined, defaultHex: string): string {
-  if (!param) return `#${defaultHex}`;
-  const s = Array.isArray(param) ? param[0] : param;
-  if (s.toLowerCase() === 'brand') return `#${defaultHex}`;
-  if (/^[0-9A-Fa-f]{3,6}$/.test(s)) return `#${s}`;
-  if (s.startsWith('#')) return s;
-  return s;
-}
-
-function buildSvg(icon: { title: string; path: string }, color: string, size?: number): string {
-  const sizeAttr = size ? ` width="${size}" height="${size}"` : '';
-  return `<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="${color}"${sizeAttr}><title>${icon.title}</title><path d="${icon.path}"/></svg>`;
-}
-
-async function svgToPng(svg: string, size: number): Promise<Buffer> {
-  const { Resvg } = await import('@resvg/resvg-js');
-  const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: size } });
-  return resvg.render().asPng();
-}
-
-function pngToIco(png: Buffer, size: number): Buffer {
-  const header = Buffer.alloc(6);
-  header.writeUInt16LE(0, 0);
-  header.writeUInt16LE(1, 2);
-  header.writeUInt16LE(1, 4);
-
-  const entry = Buffer.alloc(16);
-  const s = size >= 256 ? 0 : size;
-  entry.writeUInt8(s, 0);
-  entry.writeUInt8(s, 1);
-  entry.writeUInt8(0, 2);
-  entry.writeUInt8(0, 3);
-  entry.writeUInt16LE(1, 4);
-  entry.writeUInt16LE(32, 6);
-  entry.writeUInt32LE(png.length, 8);
-  entry.writeUInt32LE(22, 12);
-
-  return Buffer.concat([header, entry, png]);
-}
-
-function getParam(val: string | string[] | undefined, fallback = ''): string {
-  return (Array.isArray(val) ? val[0] : val) ?? fallback;
-}
+import { getAllIcons, findIcon, getVersion, searchIcons } from './icons.js';
+import { buildSvg, svgToPng, pngToIco, iconJsonBody } from './render.js';
+import { parseColor, parseSize, getParam, endpointLimits } from './params.js';
 
 function setCors(res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -137,11 +45,15 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
+  const parsed   = url.parse(req.url || '', true);
+  const pathname = parsed.pathname || '';
+  const query    = parsed.query;
+
   // Rate limiting — applied before any work is done.
-  // Wrapped defensively: a crash here must never take down the API.
+  // Limits vary by endpoint cost; metadata routes are more permissive than raster routes.
   let rl: Awaited<ReturnType<typeof checkRateLimit>>;
   try {
-    rl = await checkRateLimit(req);
+    rl = await checkRateLimit(req, endpointLimits(pathname, query.action));
   } catch (err) {
     console.error('[api] checkRateLimit threw unexpectedly:', err);
     rl = { allowed: true, tier: 'anonymous', limit: -1, remaining: -1, reset: 0 };
@@ -153,13 +65,9 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  const parsed = url.parse(req.url || '', true);
-  const pathname = parsed.pathname || '';
-  const query = parsed.query;
-
   // GET /api/search?q=&limit=
   if (query.action === 'search' || pathname === '/api/search') {
-    const q = getParam(query.q);
+    const q     = getParam(query.q);
     const limit = Math.min(parseInt(getParam(query.limit, '10'), 10) || 10, 100);
 
     if (!q.trim()) {
@@ -176,6 +84,26 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
+  // GET /api/stats
+  if (query.action === 'stats' || pathname === '/api/stats') {
+    const icons   = await getAllIcons();
+    const version = await getVersion();
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    res.end(JSON.stringify({
+      total: icons.length,
+      version,
+      formats: ['svg', 'png', 'ico', 'json'],
+      rateLimit: {
+        anonymous: { requests: 30,  window: '1m', per: 'IP'  },
+        basic:     { requests: 200, window: '1m', per: 'key' },
+        master:    { requests: -1,  window: null, per: 'key' },
+      },
+    }));
+    return;
+  }
+
   // GET /api/icons/all — full list with path data
   if (query.action === 'icons-all' || pathname === '/api/icons/all') {
     res.statusCode = 200;
@@ -187,7 +115,7 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
 
   // GET /api/icons — lightweight list, optional ?page=&limit=
   if (query.action === 'icons' || pathname === '/api/icons') {
-    const list = (await getAllIcons()).map(({ title, slug, hex }) => ({ title, slug, hex }));
+    const list  = (await getAllIcons()).map(({ title, slug, hex }) => ({ title, slug, hex }));
     const limit = parseInt(getParam(query.limit, '0'), 10) || 0;
 
     res.statusCode = 200;
@@ -195,8 +123,8 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=3600');
 
     if (limit > 0) {
-      const page = parseInt(getParam(query.page, '1'), 10) || 1;
-      const cap = Math.min(limit, 1000);
+      const page  = parseInt(getParam(query.page, '1'), 10) || 1;
+      const cap   = Math.min(limit, 1000);
       const start = (page - 1) * cap;
       res.end(JSON.stringify({
         total: list.length,
@@ -211,6 +139,70 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
+  // GET /api/icons/:slug — single icon JSON metadata
+  if (query.action === 'icon-slug' || (pathname.startsWith('/api/icons/') && pathname !== '/api/icons/all')) {
+    const slugPart = query.action === 'icon-slug'
+      ? getParam(query.slug)
+      : pathname.substring('/api/icons/'.length);
+    if (slugPart) {
+      const icon = await findIcon(slugPart);
+      if (!icon) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: `Icon '${slugPart}' not found` }));
+        return;
+      }
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.end(JSON.stringify(iconJsonBody(icon)));
+      return;
+    }
+  }
+
+  // GET /api/random[.svg|.png|.ico|.json]
+  if (query.action === 'random' || pathname.startsWith('/api/random')) {
+    let format = 'svg';
+    if (pathname.endsWith('.png'))       format = 'png';
+    else if (pathname.endsWith('.ico'))  format = 'ico';
+    else if (pathname.endsWith('.json')) format = 'json';
+
+    const allIcons = await getAllIcons();
+    const icon     = allIcons[Math.floor(Math.random() * allIcons.length)];
+
+    res.setHeader('Cache-Control', 'no-store');
+
+    if (format === 'json') {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify(iconJsonBody(icon)));
+      return;
+    }
+
+    const color   = parseColor(query.color, icon.hex);
+    const sizeVal = parseSize(query.size);
+
+    if (format === 'svg') {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'image/svg+xml');
+      res.end(buildSvg(icon, color, sizeVal || undefined));
+      return;
+    }
+
+    const rasterSize = sizeVal || 128;
+    try {
+      const png = await svgToPng(buildSvg(icon, color), rasterSize);
+      res.statusCode = 200;
+      res.setHeader('Content-Type', format === 'ico' ? 'image/x-icon' : 'image/png');
+      res.end(format === 'ico' ? pngToIco(png, rasterSize) : png);
+    } catch (err) {
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'Render failed', message: String(err) }));
+    }
+    return;
+  }
+
   // GET /api/asset/:slug (.svg | .png | .ico | .json)
   let slugParam = '';
   if (query.slug) {
@@ -220,10 +212,10 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (slugParam) {
-    let format = 'svg';
+    let format    = 'svg';
     let cleanSlug = slugParam;
 
-    if (slugParam.endsWith('.svg'))  { format = 'svg';  cleanSlug = slugParam.slice(0, -4); }
+    if (slugParam.endsWith('.svg'))       { format = 'svg';  cleanSlug = slugParam.slice(0, -4); }
     else if (slugParam.endsWith('.png'))  { format = 'png';  cleanSlug = slugParam.slice(0, -4); }
     else if (slugParam.endsWith('.ico'))  { format = 'ico';  cleanSlug = slugParam.slice(0, -4); }
     else if (slugParam.endsWith('.json')) { format = 'json'; cleanSlug = slugParam.slice(0, -5); }
@@ -242,20 +234,12 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     if (format === 'json') {
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({
-        title: icon.title,
-        slug: icon.slug,
-        hex: icon.hex,
-        color: `#${icon.hex}`,
-        path: icon.path,
-        svg: buildSvg(icon, `#${icon.hex}`),
-      }));
+      res.end(JSON.stringify(iconJsonBody(icon)));
       return;
     }
 
-    const color = parseColor(query.color, icon.hex);
-    const sizeRaw = getParam(query.size);
-    const sizeVal = sizeRaw ? Math.max(16, Math.min(512, parseInt(sizeRaw, 10) || 128)) : 0;
+    const color   = parseColor(query.color, icon.hex);
+    const sizeVal = parseSize(query.size);
 
     if (format === 'svg') {
       res.statusCode = 200;
