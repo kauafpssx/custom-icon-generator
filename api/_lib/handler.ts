@@ -233,7 +233,16 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
       return;
     }
 
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    const isRandomColor = typeof query.color === 'string' && query.color.toLowerCase() === 'random';
+    const isRandomSize  = typeof query.size === 'string' && query.size.toLowerCase() === 'random';
+
+    if (isRandomColor || isRandomSize) {
+      res.setHeader('Cache-Control', 'private, no-cache, no-store, max-age=0, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
 
     if (format === 'json') {
       res.statusCode = 200;
