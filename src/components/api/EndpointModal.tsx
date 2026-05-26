@@ -46,7 +46,10 @@ function buildUrl(endpoint: ApiEndpoint, values: Record<string, string>): string
     } else if (v) {
       if (p.isColor) {
         const clean = v.startsWith('#') ? v.slice(1) : v;
-        if (clean && clean !== '000000') qs.set(p.name, clean);
+        if (clean) {
+          if (p.name === 'color' && clean === '000000') continue;
+          qs.set(p.name, clean);
+        }
       } else {
         qs.set(p.name, v);
       }
@@ -296,7 +299,29 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '', onAfterExe
 
                     {p.isColor ? (
                       <div className="flex items-center gap-2">
-                        {values[p.name]?.toLowerCase() === 'random' ? (
+                        {p.name === 'background' ? (
+                          values[p.name]?.toLowerCase() === 'transparent' ? (
+                            <div
+                              className="h-10 w-10 rounded border-2 shrink-0"
+                              style={{ backgroundImage: 'repeating-conic-gradient(#d0d0d0 0% 25%, #ffffff 0% 50%)', backgroundSize: '8px 8px' }}
+                              title="Transparent background"
+                            />
+                          ) : values[p.name]?.toLowerCase() === 'default' ? (
+                            <div
+                              className="h-10 w-10 rounded border-2 shrink-0 bg-white"
+                              title="White background"
+                            />
+                          ) : (
+                            <ColorPicker
+                              value={
+                                values[p.name] && /^#[0-9A-F]{6}$/i.test(values[p.name])
+                                  ? values[p.name]
+                                  : '#000000'
+                              }
+                              onChange={(v) => setValue(p.name, v)}
+                            />
+                          )
+                        ) : values[p.name]?.toLowerCase() === 'random' ? (
                           <div
                             className="h-10 w-10 rounded border-2 shrink-0"
                             style={{ background: 'conic-gradient(in hsl longer hue, red 0%, red 100%)' }}
@@ -315,7 +340,7 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '', onAfterExe
                         <Input
                           value={values[p.name] ?? ''}
                           onChange={(e) => setValue(p.name, e.target.value)}
-                          placeholder="brand"
+                          placeholder={p.placeholder || 'brand'}
                           className="font-mono w-32 text-sm"
                         />
                         <Button
@@ -331,7 +356,7 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '', onAfterExe
                       <div className="relative">
                         {values[p.name] && icons.some((i) => i.s === values[p.name]) && (
                           <img
-                            src={`/api/asset/${values[p.name]}.svg${currentIconHex ? `?color=${currentIconHex}` : ''}`}
+                            src={`/api/asset/${values[p.name]}.svg?background=transparent${currentIconHex ? `&color=${currentIconHex}` : ''}`}
                             alt=""
                             aria-hidden="true"
                             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none z-10"
@@ -357,7 +382,7 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '', onAfterExe
                                 onMouseDown={() => pickSlug(p.name, i.s)}
                               >
                                 <img
-                                  src={`/api/asset/${i.s}.svg?color=${i.c}`}
+                                  src={`/api/asset/${i.s}.svg?background=transparent&color=${i.c}`}
                                   alt=""
                                   aria-hidden="true"
                                   className="w-4 h-4 shrink-0"
