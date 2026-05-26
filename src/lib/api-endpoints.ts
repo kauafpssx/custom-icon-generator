@@ -20,7 +20,7 @@ export interface ApiEndpoint {
   responseType: 'json' | 'image';
 }
 
-export const API_TAGS = ['Icons', 'Assets'] as const;
+export const API_TAGS = ['Icons', 'Assets', 'Random', 'Meta'] as const;
 
 export const ENDPOINTS: ApiEndpoint[] = [
   {
@@ -57,6 +57,17 @@ export const ENDPOINTS: ApiEndpoint[] = [
     responseType: 'json',
   },
   {
+    id: 'icon-slug',
+    tag: 'Icons',
+    path: '/api/icons/{slug}',
+    summary: 'Get icon by slug',
+    desc: 'Returns full JSON metadata for a single icon: title, slug, hex, path, svg, and optional source, guidelines, license.',
+    params: [
+      { name: 'slug', loc: 'path', type: 'string', required: true, desc: 'Icon slug', placeholder: 'react', defaultValue: 'react', isSlug: true },
+    ],
+    responseType: 'json',
+  },
+  {
     id: 'asset-svg',
     tag: 'Assets',
     path: '/api/asset/{slug}.svg',
@@ -64,8 +75,8 @@ export const ENDPOINTS: ApiEndpoint[] = [
     desc: 'Returns an SVG image. Scalable and color-customizable.',
     params: [
       { name: 'slug', loc: 'path', type: 'string', required: true, desc: 'Icon slug', placeholder: 'react', defaultValue: 'react', isSlug: true },
-      { name: 'color', loc: 'query', type: 'string', required: false, desc: 'Hex color or "brand" for the icon\'s default color', isColor: true, defaultValue: 'brand' },
-      { name: 'size', loc: 'query', type: 'integer', required: false, desc: 'Width/height in pixels (16–512)', placeholder: '128' },
+      { name: 'color', loc: 'query', type: 'string', required: false, desc: 'Hex color, "brand" for the icon\'s default color, or "random"', isColor: true, defaultValue: 'brand' },
+      { name: 'size', loc: 'query', type: 'string', required: false, desc: 'Width/height in pixels (16–512) or "random"', placeholder: '128' },
     ],
     responseType: 'image',
   },
@@ -77,8 +88,8 @@ export const ENDPOINTS: ApiEndpoint[] = [
     desc: 'Rasterized PNG image via resvg. Default 128×128px.',
     params: [
       { name: 'slug', loc: 'path', type: 'string', required: true, desc: 'Icon slug', placeholder: 'react', defaultValue: 'react', isSlug: true },
-      { name: 'color', loc: 'query', type: 'string', required: false, desc: 'Hex color or "brand" for the icon\'s default color', isColor: true, defaultValue: 'brand' },
-      { name: 'size', loc: 'query', type: 'integer', required: false, desc: 'Pixels (16–512)', placeholder: '128', defaultValue: '128' },
+      { name: 'color', loc: 'query', type: 'string', required: false, desc: 'Hex color, "brand" for the icon\'s default color, or "random"', isColor: true, defaultValue: 'brand' },
+      { name: 'size', loc: 'query', type: 'string', required: false, desc: 'Pixels (16–512) or "random"', placeholder: '128', defaultValue: '128' },
     ],
     responseType: 'image',
   },
@@ -90,8 +101,8 @@ export const ENDPOINTS: ApiEndpoint[] = [
     desc: 'ICO file (PNG-in-ICO). Ideal for favicons. Default 32×32px.',
     params: [
       { name: 'slug', loc: 'path', type: 'string', required: true, desc: 'Icon slug', placeholder: 'react', defaultValue: 'react', isSlug: true },
-      { name: 'color', loc: 'query', type: 'string', required: false, desc: 'Hex color or "brand" for the icon\'s default color', isColor: true, defaultValue: 'brand' },
-      { name: 'size', loc: 'query', type: 'integer', required: false, desc: 'Pixels (16–512)', placeholder: '32', defaultValue: '32' },
+      { name: 'color', loc: 'query', type: 'string', required: false, desc: 'Hex color, "brand" for the icon\'s default color, or "random"', isColor: true, defaultValue: 'brand' },
+      { name: 'size', loc: 'query', type: 'string', required: false, desc: 'Pixels (16–512) or "random"', placeholder: '32', defaultValue: '32' },
     ],
     responseType: 'image',
   },
@@ -100,10 +111,40 @@ export const ENDPOINTS: ApiEndpoint[] = [
     tag: 'Assets',
     path: '/api/asset/{slug}.json',
     summary: 'Get icon metadata',
-    desc: 'Returns JSON with title, slug, hex, path, and a pre-built SVG string.',
+    desc: 'Returns JSON with title, slug, hex, path, svg, and optional source, guidelines, license fields.',
     params: [
       { name: 'slug', loc: 'path', type: 'string', required: true, desc: 'Icon slug', placeholder: 'react', defaultValue: 'react', isSlug: true },
     ],
+    responseType: 'json',
+  },
+  {
+    id: 'random-svg',
+    tag: 'Random',
+    path: '/api/random.svg',
+    summary: 'Random icon SVG',
+    desc: 'Returns a random icon as SVG. Never cached. Supports ?color= and ?size=.',
+    params: [
+      { name: 'color', loc: 'query', type: 'string', required: false, desc: 'Hex color or "brand"', isColor: true, defaultValue: 'brand' },
+      { name: 'size', loc: 'query', type: 'string', required: false, desc: 'Width/height in pixels (16–512) or "random"', placeholder: '128' },
+    ],
+    responseType: 'image',
+  },
+  {
+    id: 'random-json',
+    tag: 'Random',
+    path: '/api/random.json',
+    summary: 'Random icon metadata',
+    desc: 'Returns a random icon as JSON with full metadata. Never cached.',
+    params: [],
+    responseType: 'json',
+  },
+  {
+    id: 'stats',
+    tag: 'Meta',
+    path: '/api/stats',
+    summary: 'API statistics',
+    desc: 'Returns total icon count, simple-icons version, supported formats, and rate limit tiers.',
+    params: [],
     responseType: 'json',
   },
 ];

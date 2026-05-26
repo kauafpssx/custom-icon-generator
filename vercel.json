@@ -9,9 +9,12 @@
   },
   "rewrites": [
     { "source": "/api/asset/:slug*", "destination": "/api/index?slug=:slug*" },
+    { "source": "/api/stats",        "destination": "/api/index?action=stats" },
     { "source": "/api/search",       "destination": "/api/index?action=search" },
     { "source": "/api/icons/all",    "destination": "/api/index?action=icons-all" },
+    { "source": "/api/icons/:slug",  "destination": "/api/index?action=icon-slug&slug=:slug" },
     { "source": "/api/icons",        "destination": "/api/index?action=icons" },
+    { "source": "/api/random",       "destination": "/api/index?action=random" },
     { "source": "/api/:path*",       "destination": "/api/index" },
     { "source": "/((?!api/).*)",     "destination": "/index.html" }
   ]

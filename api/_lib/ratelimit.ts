@@ -22,6 +22,11 @@ export const TIER_LIMIT: Record<'anonymous' | 'basic', number> = {
   basic:     BASIC_REQUESTS,
 };
 
+export interface RateLimitOverrides {
+  anon?: number;
+  basic?: number;
+}
+
 // ── Persistent state (survives Vite HMR module re-evaluation) ────────────────
 // In dev mode, Vite can re-evaluate this module on each request, which would
 // reset plain `const` Maps to empty. Storing state on globalThis ensures the
@@ -201,14 +206,16 @@ function resolveAuth(req: IncomingMessage): AuthResult {
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
-export async function checkRateLimit(req: IncomingMessage): Promise<RateLimitResult> {
+export async function checkRateLimit(req: IncomingMessage, overrides?: RateLimitOverrides): Promise<RateLimitResult> {
   const { tier, identifier } = resolveAuth(req);
 
   if (tier === 'master') {
     return { allowed: true, tier, limit: -1, remaining: -1, reset: 0 };
   }
 
-  const max  = TIER_LIMIT[tier];
+  const max  = tier === 'basic'
+    ? (overrides?.basic ?? TIER_LIMIT.basic)
+    : (overrides?.anon  ?? TIER_LIMIT.anonymous);
   const pair = await tryGetPair();
 
   if (pair) {
