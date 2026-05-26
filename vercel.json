@@ -8,14 +8,17 @@
     }
   },
   "rewrites": [
-    { "source": "/api/asset/:slug*", "destination": "/api/index?slug=:slug*" },
+    { "source": "/api/asset/(.+)",   "destination": "/api/index?slug=$1" },
     { "source": "/api/stats",        "destination": "/api/index?action=stats" },
     { "source": "/api/search",       "destination": "/api/index?action=search" },
     { "source": "/api/icons/all",    "destination": "/api/index?action=icons-all" },
-    { "source": "/api/icons/:slug",  "destination": "/api/index?action=icon-slug&slug=:slug" },
+    { "source": "/api/icons/(.+)",   "destination": "/api/index?action=icon-slug&slug=$1" },
     { "source": "/api/icons",        "destination": "/api/index?action=icons" },
     { "source": "/api/random",       "destination": "/api/index?action=random" },
+    { "source": "/api/favicon.json", "destination": "/api/index?action=favicon" },
     { "source": "/api/:path*",       "destination": "/api/index" },
+    { "source": "/asset/(.+)",       "destination": "/api/index?slug=$1" },
+    { "source": "/([^/]+)\\.(svg|png|ico|json)", "destination": "/api/index?slug=$1.$2" },
     { "source": "/((?!api/).*)",     "destination": "/index.html" }
   ]
 }

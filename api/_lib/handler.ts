@@ -4,6 +4,7 @@ import { checkRateLimit, applyRateLimitHeaders } from './ratelimit.js';
 import { getAllIcons, findIcon, getVersion, searchIcons } from './icons.js';
 import { buildSvg, svgToPng, pngToIco, iconJsonBody } from './render.js';
 import { parseColor, parseSize, parseBackground, getParam, endpointLimits } from './params.js';
+import { faviconJsonBody } from './favicon.js';
 
 function setCors(res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -101,6 +102,15 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
         master:    { requests: -1,  window: null, per: 'key' },
       },
     }));
+    return;
+  }
+
+  // GET /api/favicon.json — site favicon metadata
+  if (query.action === 'favicon' || pathname === '/api/favicon.json') {
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=3600');
+    res.end(JSON.stringify(faviconJsonBody()));
     return;
   }
 

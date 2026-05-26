@@ -1,10 +1,10 @@
 # 🎨 Custom Icon Generator
 
 <p align="center">
-  <a href="https://custom-icon-generator.vercel.app">
+  <a href="https://icons.kauafpss.com.br">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://custom-icon-generator.vercel.app/api/asset/rectangles.svg?color=61dafb&background=0a0a0f&size=64">
-      <img src="https://custom-icon-generator.vercel.app/api/asset/rectangles.svg?color=61dafb&size=64" alt="Icon" width="64" height="64">
+      <source media="(prefers-color-scheme: dark)" srcset="https://icons.kauafpss.com.br/api/asset/rectangles.svg?color=61dafb&background=0a0a0f&size=64">
+      <img src="https://icons.kauafpss.com.br/api/asset/rectangles.svg?color=61dafb&size=64" alt="Icon" width="64" height="64">
     </picture>
   </a>
   <br>
@@ -13,8 +13,8 @@
 </p>
 
 <p align="center">
-  <a href="https://custom-icon-generator.vercel.app"><img src="https://img.shields.io/badge/Live_Demo-18181b?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel"></a>
-  <a href="https://custom-icon-generator.vercel.app/playground"><img src="https://img.shields.io/badge/API_Playground-8b5cf6?style=for-the-badge&logo=swagger&logoColor=white" alt="Playground"></a>
+  <a href="https://icons.kauafpss.com.br"><img src="https://img.shields.io/badge/Live_Demo-18181b?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel"></a>
+  <a href="https://icons.kauafpss.com.br/playground"><img src="https://img.shields.io/badge/API_Playground-8b5cf6?style=for-the-badge&logo=swagger&logoColor=white" alt="Playground"></a>
   <a href="#-rest-api"><img src="https://img.shields.io/badge/Docs-READ.me-3b82f6?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Docs"></a>
   <br>
   <img src="https://img.shields.io/badge/React_18-61dafb?style=flat-square&logo=react&logoColor=black" alt="React">
@@ -26,13 +26,13 @@
 </p>
 
 <p align="center">
-  <img src="https://custom-icon-generator.vercel.app/api/asset/react.svg?color=random&size=40" alt="React" width="40" height="40">
-  <img src="https://custom-icon-generator.vercel.app/api/asset/typescript.svg?color=random&size=40" alt="TypeScript" width="40" height="40">
-  <img src="https://custom-icon-generator.vercel.app/api/asset/tailwindcss.svg?color=random&size=40" alt="Tailwind" width="40" height="40">
-  <img src="https://custom-icon-generator.vercel.app/api/asset/vite.svg?color=random&size=40" alt="Vite" width="40" height="40">
-  <img src="https://custom-icon-generator.vercel.app/api/asset/simpleicons.svg?color=random&size=40" alt="Simple Icons" width="40" height="40">
-  <img src="https://custom-icon-generator.vercel.app/api/asset/vercel.svg?color=random&size=40" alt="Vercel" width="40" height="40">
-  <img src="https://custom-icon-generator.vercel.app/api/asset/upstash.svg?color=random&size=40" alt="Upstash" width="40" height="40">
+  <a href="https://icons.kauafpss.com.br/react.svg?color=a78bfa"><img src="https://icons.kauafpss.com.br/react.svg?color=a78bfa&size=40" alt="React" width="40" height="40"></a>
+  <a href="https://icons.kauafpss.com.br/typescript.svg?color=a78bfa"><img src="https://icons.kauafpss.com.br/typescript.svg?color=a78bfa&size=40" alt="TypeScript" width="40" height="40"></a>
+  <a href="https://icons.kauafpss.com.br/tailwindcss.svg?color=a78bfa"><img src="https://icons.kauafpss.com.br/tailwindcss.svg?color=a78bfa&size=40" alt="Tailwind" width="40" height="40"></a>
+  <a href="https://icons.kauafpss.com.br/vite.svg?color=a78bfa"><img src="https://icons.kauafpss.com.br/vite.svg?color=a78bfa&size=40" alt="Vite" width="40" height="40"></a>
+  <a href="https://icons.kauafpss.com.br/simpleicons.svg?color=a78bfa"><img src="https://icons.kauafpss.com.br/simpleicons.svg?color=a78bfa&size=40" alt="Simple Icons" width="40" height="40"></a>
+  <a href="https://icons.kauafpss.com.br/vercel.svg?color=a78bfa"><img src="https://icons.kauafpss.com.br/vercel.svg?color=a78bfa&size=40" alt="Vercel" width="40" height="40"></a>
+  <a href="https://icons.kauafpss.com.br/upstash.svg?color=a78bfa"><img src="https://icons.kauafpss.com.br/upstash.svg?color=a78bfa&size=40" alt="Upstash" width="40" height="40"></a>
 </p>
 
 ---
@@ -67,7 +67,7 @@
 | 📐 **Custom Resolution** | Configure PNG/ICO downloads up to 4096×4096px |
 | 📦 **Batch Download** | Select multiple icons, download as a single ZIP |
 | 🔬 **SVG Code Viewer** | Inspect and copy colored SVG markup with syntax highlighting |
-| 🌐 **API Playground** | Interactive docs at [`/playground`](https://custom-icon-generator.vercel.app/playground) — test every endpoint live |
+| 🌐 **API Playground** | Interactive docs at [`/playground`](https://icons.kauafpss.com.br/playground) — test every endpoint live |
 | ⚡ **Public REST API** | Programmatic access: SVG, PNG, ICO, JSON |
 | 🖼️ **Background Support** | Add solid or transparent backgrounds to raster outputs |
 | 📱 **PWA Ready** | Install as a progressive web app for offline access |
@@ -113,7 +113,7 @@ graph TB
 
 ## 🌐 REST API
 
-Full interactive docs available at **[`/playground`](https://custom-icon-generator.vercel.app/playground)**.  
+Full interactive docs available at **[`/playground`](https://icons.kauafpss.com.br/playground)**.  
 All endpoints are `GET`, CORS-enabled (`*`), and rate-limited per IP or API key.
 
 <details>
@@ -143,7 +143,17 @@ All endpoints are `GET`, CORS-enabled (`*`), and rate-limited per IP or API key.
 | :----- | :--- | :---------- |
 | `GET` | `/api/random.svg` | 🎲 Random icon as SVG. Never cached. |
 | `GET` | `/api/random.json` | 🎲 Random icon as JSON with full metadata. Never cached. |
+| `GET` | `/api/favicon.json` | 🌟 Site favicon metadata (custom SVG + title). |
 | `GET` | `/api/stats` | 📈 Total icon count, simple-icons version, formats, and rate limit tiers. |
+
+### Direct Access (no `/api/` prefix)
+
+| Method | Path | Description |
+| :----- | :--- | :---------- |
+| `GET` | `/:slug.svg` | 🎨 Direct icon SVG (e.g., [`/react.svg?color=a78bfa`](https://icons.kauafpss.com.br/react.svg?color=a78bfa)) |
+| `GET` | `/:slug.png` | 🖼️ Direct icon PNG |
+| `GET` | `/:slug.ico` | 🏷️ Direct icon ICO |
+| `GET` | `/:slug.json` | 📊 Direct icon JSON |
 
 ### Color, Size & Background Reference
 
@@ -170,29 +180,32 @@ X-Color: FF5733          ← included when color=random
 
 ```bash
 # Random color, specific size
-curl "https://custom-icon-generator.vercel.app/api/asset/github.svg?color=random&size=64"
+curl "https://icons.kauafpss.com.br/github.svg?color=random&size=64"
 
 # Brand color, specific background
-curl "https://custom-icon-generator.vercel.app/api/asset/react.png?color=brand&background=ffffff"
+curl "https://icons.kauafpss.com.br/api/asset/react.png?color=brand&background=ffffff"
 
 # Custom color + random size
-curl "https://custom-icon-generator.vercel.app/api/asset/typescript.svg?color=3178c6&size=random"
+curl "https://icons.kauafpss.com.br/typescript.svg?color=3178c6&size=random"
 
 # Random icon with transparent background
-curl "https://custom-icon-generator.vercel.app/api/random.svg?color=random&background=transparent"
+curl "https://icons.kauafpss.com.br/api/random.svg?color=random&background=transparent"
 
 # Full metadata
-curl "https://custom-icon-generator.vercel.app/api/icons/vscode"
+curl "https://icons.kauafpss.com.br/api/icons/vscode"
+
+# Site favicon metadata
+curl "https://icons.kauafpss.com.br/api/favicon.json"
 ```
 
 **Embedding in GitHub READMEs:**
 
 ```markdown
-<!-- Random color (cached by GitHub proxy — use a specific hex for consistency) -->
-<img src="https://custom-icon-generator.vercel.app/api/asset/react.svg?color=61dafb&size=32" alt="React">
+<!-- Direct access — clean URL without /api/asset/ -->
+<img src="https://icons.kauafpss.com.br/react.svg?color=a78bfa&size=32" alt="React">
 
 <!-- With background for dark theme visibility -->
-<img src="https://custom-icon-generator.vercel.app/api/asset/react.svg?color=61dafb&background=0a0a0f&size=32" alt="React">
+<img src="https://icons.kauafpss.com.br/vite.svg?color=a78bfa&background=0a0a0f&size=32" alt="Vite">
 ```
 
 </details>
@@ -330,7 +343,7 @@ pnpm dev
 | 🎨 **Color** | Click the color swatch to open the hex picker, hit **Shuffle** for a random color, or **Bookmark** to save it to your recent list. |
 | 📐 **Resolution** | Click the resolution button (e.g., `256×256`) to configure PNG/ICO size, up to 4096px. |
 | ⬇️ **Download** | Each icon card has SVG / PNG / ICO buttons. Select 2+ cards to enable the batch panel — downloads a ZIP. |
-| 🌐 **API Playground** | Click **API System** or visit [`/playground`](https://custom-icon-generator.vercel.app/playground) to explore every endpoint interactively. Authorize with your API key to unlock higher rate limits. |
+| 🌐 **API Playground** | Click **API System** or visit [`/playground`](https://icons.kauafpss.com.br/playground) to explore every endpoint interactively. Authorize with your API key to unlock higher rate limits. |
 
 </details>
 
@@ -344,7 +357,7 @@ The API generates a new random color on every request. Use it for dynamic UIs wh
 ```javascript
 // Fetch an icon with a random color
 const response = await fetch(
-  "https://custom-icon-generator.vercel.app/api/asset/react.svg?color=random"
+  "https://icons.kauafpss.com.br/api/asset/react.svg?color=random"
 );
 const svgBlob = await response.blob();
 
@@ -355,7 +368,7 @@ const svgBlob = await response.blob();
 
 ```javascript
 const response = await fetch(
-  "https://custom-icon-generator.vercel.app/api/asset/react.svg?color=random"
+  "https://icons.kauafpss.com.br/api/asset/react.svg?color=random"
 );
 const resolvedColor = response.headers.get("X-Color"); // e.g., "FF5733"
 ```
