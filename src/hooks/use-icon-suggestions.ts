@@ -50,7 +50,6 @@ export function useIconSuggestions({ apiKey }: UseIconSuggestionsOptions) {
       fetchingRef.current = false;
     }
   // stable: apiKeyRef always fresh, iconsRef always fresh — no deps needed
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateQuery = useCallback((paramName: string, q: string) => {

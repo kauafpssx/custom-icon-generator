@@ -12,11 +12,11 @@ interface IconInfoCardProps {
 
 // Function to fetch original Simple Icon data using the slug
 const getOriginalIconData = (slug: string) => {
-  // Simple Icons exports objects with the key being the title, but we need to find by slug
-  const iconKey = Object.keys(allSimpleIcons).find(key => 
-    (allSimpleIcons as any)[key].slug === slug
+  const icons = allSimpleIcons as unknown as Record<string, { slug: string; hex: string; source?: string }>;
+  const iconKey = Object.keys(icons).find(key => 
+    icons[key].slug === slug
   );
-  return iconKey ? (allSimpleIcons as any)[iconKey] : null;
+  return iconKey ? icons[iconKey] : null;
 };
 
 export const IconInfoCard: React.FC<IconInfoCardProps> = ({ icon, onColorSelect }) => {

@@ -170,7 +170,11 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     const allIcons = await getAllIcons();
     const icon     = allIcons[Math.floor(Math.random() * allIcons.length)];
 
-    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, max-age=0, must-revalidate');
+    res.setHeader('CDN-Cache-Control', 'no-store');
+    res.setHeader('Vercel-CDN-Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     if (format === 'json') {
       res.statusCode = 200;

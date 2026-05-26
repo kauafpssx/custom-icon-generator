@@ -32,8 +32,8 @@ export interface RateLimitOverrides {
 const _g = globalThis as typeof globalThis & {
   __rl?: {
     memStore: Map<string, number[]>;
-    redis: any | null | undefined;
-    limiters: Map<string, any>;
+    redis: import('@upstash/redis').Redis | null | undefined;
+    limiters: Map<string, import('@upstash/ratelimit').Ratelimit>;
     lastEvict: number;
   };
 };

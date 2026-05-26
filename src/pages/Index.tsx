@@ -295,7 +295,7 @@ const Index = () => {
             </Tooltip>
 
             {/* Right: Sorting */}
-            <ToggleGroup type="single" value={sortBy} onValueChange={(value) => value && setSortBy(value as any)}>
+            <ToggleGroup type="single" value={sortBy} onValueChange={(value) => value && setSortBy(value as 'random' | 'az' | 'za')}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <ToggleGroupItem value="random" aria-label="Sort randomly">

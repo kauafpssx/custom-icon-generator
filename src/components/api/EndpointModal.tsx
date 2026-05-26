@@ -203,7 +203,7 @@ export function EndpointModal({ endpoint, open, onClose, apiKey = '', onAfterExe
             truncated = true;
           }
         } else {
-          try { body = JSON.stringify(JSON.parse(text), null, 2); } catch {}
+          try { body = JSON.stringify(JSON.parse(text), null, 2); } catch { /* ignore parsing errors */ }
         }
 
         setResponse({
