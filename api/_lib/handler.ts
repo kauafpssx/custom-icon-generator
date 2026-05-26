@@ -10,7 +10,7 @@ function setCors(res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key');
   res.setHeader('Access-Control-Expose-Headers',
-    'X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-RateLimit-Tier, Retry-After');
+    'X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-RateLimit-Tier, Retry-After, X-RateLimit-Identifier');
 }
 
 function send429(res: ServerResponse, retryAfter: number): void {

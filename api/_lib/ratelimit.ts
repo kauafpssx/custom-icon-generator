@@ -10,6 +10,7 @@ export interface RateLimitResult {
   remaining: number;  // -1 = count unknown
   reset: number;      // unix seconds
   retryAfter?: number;
+  identifier?: string;
 }
 
 // ── Configured limits ─────────────────────────────────────────────────────────
@@ -28,18 +29,16 @@ export interface RateLimitOverrides {
 }
 
 // ── Persistent state (survives Vite HMR module re-evaluation) ────────────────
-// In dev mode, Vite can re-evaluate this module on each request, which would
-// reset plain `const` Maps to empty. Storing state on globalThis ensures the
-// sliding-window counters persist across reloads for the lifetime of the process.
 const _g = globalThis as typeof globalThis & {
   __rl?: {
     memStore: Map<string, number[]>;
-    pair: LimiterPair | null | undefined;
+    redis: any | null | undefined;
+    limiters: Map<string, any>;
     lastEvict: number;
   };
 };
 if (!_g.__rl) {
-  _g.__rl = { memStore: new Map(), pair: undefined, lastEvict: Date.now() };
+  _g.__rl = { memStore: new Map(), redis: undefined, limiters: new Map(), lastEvict: Date.now() };
 }
 const _state = _g.__rl;
 
@@ -89,56 +88,58 @@ function inMemoryCheck(
 }
 
 // ── Upstash Redis (optional, enhances to distributed RL) ─────────────────────
-interface LimiterPair {
-  anon:  import('@upstash/ratelimit').Ratelimit;
-  basic: import('@upstash/ratelimit').Ratelimit;
-}
-
-async function tryGetPair(): Promise<LimiterPair | null> {
-  if (_state.pair !== undefined) return _state.pair;
+async function tryGetRatelimit(tier: 'anon' | 'basic', max: number): Promise<import('@upstash/ratelimit').Ratelimit | null> {
+  if (_state.redis === null) return null;
 
   const url   = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
   if (!url || !token) {
-    _state.pair = null;
+    _state.redis = null;
     return null;
   }
 
-  try {
-    const [{ Ratelimit }, { Redis }] = await Promise.all([
-      import('@upstash/ratelimit'),
-      import('@upstash/redis'),
-    ]);
+  if (_state.redis === undefined) {
+    try {
+      const { Redis } = await import('@upstash/redis');
+      const redis = new Redis({ url, token });
 
-    const redis = new Redis({ url, token });
+      // Smoke-test the connection with a short timeout
+      await Promise.race([
+        redis.set('__rl_probe__', '1', { ex: 5 }),
+        new Promise<never>((_, rej) => setTimeout(() => rej(new Error('Redis timeout')), 3000)),
+      ]);
 
-    // Smoke-test the connection with a short timeout
-    await Promise.race([
-      redis.set('__rl_probe__', '1', { ex: 5 }),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('Redis timeout')), 3000)),
-    ]);
-
-    _state.pair = {
-      anon: new Ratelimit({
-        redis,
-        limiter: Ratelimit.slidingWindow(ANON_REQUESTS, '1 m'),
-        prefix: 'rl:anon',
-      }),
-      basic: new Ratelimit({
-        redis,
-        limiter: Ratelimit.slidingWindow(BASIC_REQUESTS, '1 m'),
-        prefix: 'rl:basic',
-      }),
-    };
-
-    console.log('[ratelimit] Connected to Upstash Redis — distributed RL active');
-  } catch (err) {
-    console.warn('[ratelimit] Upstash unavailable, using in-memory RL:', (err as Error).message);
-    _state.pair = null;
+      _state.redis = redis;
+      console.log('[ratelimit] Connected to Upstash Redis');
+    } catch (err) {
+      console.warn('[ratelimit] Upstash unavailable, using in-memory RL:', (err as Error).message);
+      _state.redis = null;
+      return null;
+    }
   }
 
-  return _state.pair;
+  const redis = _state.redis;
+  if (!redis) return null;
+
+  const key = `${tier}:${max}`;
+  if (_state.limiters.has(key)) {
+    return _state.limiters.get(key);
+  }
+
+  try {
+    const { Ratelimit } = await import('@upstash/ratelimit');
+    const limiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(max, '1 m'),
+      prefix: `rl:${tier}:${max}`,
+    });
+    _state.limiters.set(key, limiter);
+    return limiter;
+  } catch (err) {
+    console.error('[ratelimit] Failed to create Ratelimit instance:', err);
+    return null;
+  }
 }
 
 // ── Key helpers ───────────────────────────────────────────────────────────────
@@ -210,18 +211,17 @@ export async function checkRateLimit(req: IncomingMessage, overrides?: RateLimit
   const { tier, identifier } = resolveAuth(req);
 
   if (tier === 'master') {
-    return { allowed: true, tier, limit: -1, remaining: -1, reset: 0 };
+    return { allowed: true, tier, limit: -1, remaining: -1, reset: 0, identifier };
   }
 
   const max  = tier === 'basic'
     ? (overrides?.basic ?? TIER_LIMIT.basic)
     : (overrides?.anon  ?? TIER_LIMIT.anonymous);
-  const pair = await tryGetPair();
+  const limiter = await tryGetRatelimit(tier === 'basic' ? 'basic' : 'anon', max);
 
-  if (pair) {
+  if (limiter) {
     // Distributed rate limiting via Upstash Redis
     try {
-      const limiter  = tier === 'basic' ? pair.basic : pair.anon;
       const r        = await limiter.limit(identifier);
       const resetSec = Math.ceil(r.reset / 1000);
       const now      = Math.floor(Date.now() / 1000);
@@ -233,11 +233,13 @@ export async function checkRateLimit(req: IncomingMessage, overrides?: RateLimit
         remaining:  r.remaining,
         reset:      resetSec,
         retryAfter: r.success ? undefined : Math.max(1, resetSec - now),
+        identifier,
       };
     } catch (err) {
       // Redis failed mid-flight — invalidate singleton so next request retries
       console.error('[ratelimit] Redis mid-flight error, falling back to in-memory:', err);
-      _state.pair = undefined;
+      _state.redis = undefined;
+      _state.limiters.clear();
     }
   }
 
@@ -252,11 +254,16 @@ export async function checkRateLimit(req: IncomingMessage, overrides?: RateLimit
     remaining:  r.remaining,
     reset:      r.reset,
     retryAfter: r.success ? undefined : Math.max(1, r.reset - now),
+    identifier,
   };
 }
 
 export function applyRateLimitHeaders(res: ServerResponse, result: RateLimitResult): void {
   res.setHeader('X-RateLimit-Tier', result.tier);
+
+  if (result.identifier) {
+    res.setHeader('X-RateLimit-Identifier', result.identifier);
+  }
 
   if (result.limit !== -1) {
     res.setHeader('X-RateLimit-Limit', String(result.limit));
