@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Package manager lock files (bun.lock is the source of truth)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+pnpm-lock.yml

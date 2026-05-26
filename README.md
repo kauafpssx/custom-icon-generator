@@ -3,8 +3,8 @@
 <p align="center">
   <a href="https://icons.kauafpss.com.br">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://icons.kauafpss.com.br/api/asset/rectangles.svg?color=61dafb&background=0a0a0f&size=64">
-      <img src="https://icons.kauafpss.com.br/api/asset/rectangles.svg?color=61dafb&size=64" alt="Icon" width="64" height="64">
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kauafpssx/custom-icon-generator/main/public/logo.svg">
+      <img src="https://raw.githubusercontent.com/kauafpssx/custom-icon-generator/main/public/logo.svg" alt="Custom Icon Generator" width="96" height="96">
     </picture>
   </a>
   <br>
@@ -230,6 +230,7 @@ Sliding-window algorithm backed by [Upstash Redis](https://upstash.com). Limits 
 
 ```bash
 node -e "const{randomBytes}=require('crypto');console.log(randomBytes(32).toString('hex'))"
+# or: bun -e "const{randomBytes}=require('crypto');console.log(randomBytes(32).toString('hex'))"
 ```
 
 Add the output to `API_KEYS_BASIC` or `API_KEYS_MASTER` (comma-separated) in your environment variables.
@@ -274,15 +275,16 @@ mindmap
 <details open>
 <summary><b>Getting Started</b></summary>
 
-**Prerequisites:** Node.js v18+ and [pnpm](https://pnpm.io/installation).
+**Prerequisites:** Node.js v18+ and [Bun](https://bun.sh/) (or [npm](https://www.npmjs.com/) as alternative).
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/kauafpssx/custom-icon-generator.git
 cd custom-icon-generator
 
-# 2. Install dependencies
-pnpm install
+# 2. Install dependencies (pick one)
+bun install        # ← primary
+npm install        # ← alternative
 
 # 3. Configure environment
 cp .env.example .env.local
@@ -290,7 +292,7 @@ cp .env.example .env.local
 # Leave blank for local dev — rate limiting falls back to in-memory
 
 # 4. Start the dev server
-pnpm dev
+bun run dev        # or: npm run dev
 # → http://localhost:8080
 ```
 
@@ -301,11 +303,11 @@ pnpm dev
 
 | Command | Description |
 | :------ | :---------- |
-| `pnpm dev` | 🚀 Start Vite dev server on port 8080 |
-| `pnpm build` | 📦 Production build |
-| `pnpm build:dev` | 🔧 Development build |
-| `pnpm preview` | 👁️ Preview production build |
-| `pnpm lint` | 🔍 Run ESLint |
+| `bun run dev` / `npm run dev` | 🚀 Start Vite dev server on port 8080 |
+| `bun run build` / `npm run build` | 📦 Production build |
+| `bun run build:dev` / `npm run build:dev` | 🔧 Development build |
+| `bun run preview` / `npm run preview` | 👁️ Preview production build |
+| `bun run lint` / `npm run lint` | 🔍 Run ESLint |
 
 </details>
 
@@ -381,7 +383,7 @@ const resolvedColor = response.headers.get("X-Color"); // e.g., "FF5733"
 
 1. 🐛 Open an [Issue](https://github.com/kauafpssx/custom-icon-generator/issues) to report bugs or propose enhancements.
 2. 🔀 Submit a [Pull Request](https://github.com/kauafpssx/custom-icon-generator/pulls) with your changes.
-3. 📝 Make sure `pnpm lint` and `pnpm build` pass.
+3. 📝 Make sure `bun run lint` (or `npm run lint`) and `bun run build` pass.
 
 ---
 
