@@ -17,6 +17,17 @@ export function parseSize(param: string | string[] | undefined): number {
   return Math.max(16, Math.min(512, parseInt(s, 10) || 128));
 }
 
+export function parseBackground(param: string | string[] | undefined): string | undefined {
+  if (!param) return undefined;
+  const s = Array.isArray(param) ? param[0] : param;
+  const lower = s.toLowerCase();
+  if (lower === 'default') return 'default';
+  if (lower === 'transparent') return 'transparent';
+  if (s.startsWith('#') && /^#[0-9A-Fa-f]{3,6}$/.test(s)) return s;
+  if (/^[0-9A-Fa-f]{3,6}$/.test(s)) return `#${s}`;
+  return undefined;
+}
+
 export function getParam(val: string | string[] | undefined, fallback = ''): string {
   return (Array.isArray(val) ? val[0] : val) ?? fallback;
 }

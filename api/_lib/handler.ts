@@ -3,7 +3,7 @@ import url from 'url';
 import { checkRateLimit, applyRateLimitHeaders } from './ratelimit.js';
 import { getAllIcons, findIcon, getVersion, searchIcons } from './icons.js';
 import { buildSvg, svgToPng, pngToIco, iconJsonBody } from './render.js';
-import { parseColor, parseSize, getParam, endpointLimits } from './params.js';
+import { parseColor, parseSize, parseBackground, getParam, endpointLimits } from './params.js';
 
 function setCors(res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -190,16 +190,19 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
       res.setHeader('X-Color', color.replace('#', ''));
     }
 
+    const bgRaw = parseBackground(query.background);
+    const bgColor = bgRaw === 'default' ? (format !== 'svg' ? '#ffffff' : undefined) : (bgRaw === 'transparent' ? undefined : bgRaw);
+
     if (format === 'svg') {
       res.statusCode = 200;
       res.setHeader('Content-Type', 'image/svg+xml');
-      res.end(buildSvg(icon, color, sizeVal || undefined));
+      res.end(buildSvg(icon, color, sizeVal || undefined, bgColor));
       return;
     }
 
     const rasterSize = sizeVal || 128;
     try {
-      const png = await svgToPng(buildSvg(icon, color), rasterSize);
+      const png = await svgToPng(buildSvg(icon, color, undefined, bgColor), rasterSize, bgColor);
       res.statusCode = 200;
       res.setHeader('Content-Type', format === 'ico' ? 'image/x-icon' : 'image/png');
       res.end(format === 'ico' ? pngToIco(png, rasterSize) : png);
@@ -260,17 +263,20 @@ async function _handleApiRequest(req: IncomingMessage, res: ServerResponse) {
 
     if (isRandomColor) res.setHeader('X-Color', color.replace('#', ''));
 
+    const bgRaw = parseBackground(query.background);
+    const bgColor = bgRaw === 'default' ? (format !== 'svg' ? '#ffffff' : undefined) : (bgRaw === 'transparent' ? undefined : bgRaw);
+
     if (format === 'svg') {
       res.statusCode = 200;
       res.setHeader('Content-Type', 'image/svg+xml');
-      res.end(buildSvg(icon, color, sizeVal || undefined));
+      res.end(buildSvg(icon, color, sizeVal || undefined, bgColor));
       return;
     }
 
     const rasterSize = sizeVal || 128;
 
     try {
-      const png = await svgToPng(buildSvg(icon, color), rasterSize);
+      const png = await svgToPng(buildSvg(icon, color, undefined, bgColor), rasterSize, bgColor);
 
       if (format === 'png') {
         res.statusCode = 200;

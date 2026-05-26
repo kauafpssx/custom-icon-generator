@@ -1,8 +1,9 @@
 import type { Icon } from './icons.js';
 
-export function buildSvg(icon: { title: string; path: string }, color: string, size?: number): string {
+export function buildSvg(icon: { title: string; path: string }, color: string, size?: number, background?: string): string {
   const sizeAttr = size ? ` width="${size}" height="${size}"` : '';
-  return `<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="${color}"${sizeAttr}><title>${icon.title}</title><path d="${icon.path}"/></svg>`;
+  const bgRect = background ? `<rect width="100%" height="100%" fill="${background}"/>` : '';
+  return `<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="${color}"${sizeAttr}><title>${icon.title}</title>${bgRect}<path d="${icon.path}"/></svg>`;
 }
 
 export function iconJsonBody(icon: Icon): Record<string, unknown> {
@@ -20,9 +21,11 @@ export function iconJsonBody(icon: Icon): Record<string, unknown> {
   return body;
 }
 
-export async function svgToPng(svg: string, size: number): Promise<Buffer> {
+export async function svgToPng(svg: string, size: number, background?: string): Promise<Buffer> {
   const { Resvg } = await import('@resvg/resvg-js');
-  const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: size } });
+  const options: Record<string, unknown> = { fitTo: { mode: 'width', value: size } };
+  if (background) options.background = background;
+  const resvg = new Resvg(svg, options);
   return resvg.render().asPng();
 }
 
