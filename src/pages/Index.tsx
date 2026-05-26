@@ -48,6 +48,7 @@ const RESOLUTION_STORAGE_KEY = 'iconGeneratorResolution';
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [color, setColor] = useState(getRandomColor());
+  const [isRandom, setIsRandom] = useState(true);
   const [recentColors, setRecentColors] = useState<string[]>([]);
   const [shuffledIcons, setShuffledIcons] = useState<IconData[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -231,13 +232,13 @@ const Index = () => {
             <div className="flex items-center gap-2 flex-wrap">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div><ColorPicker value={color} onChange={setColor} /></div>
+                  <div><ColorPicker value={color} onChange={(c) => { setColor(c); setIsRandom(false); }} /></div>
                 </TooltipTrigger>
                 <TooltipContent><p>Select Color</p></TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={() => setColor(getRandomColor())}>
+                  <Button variant="outline" size="icon" onClick={() => { setColor(getRandomColor()); setIsRandom(true); }}>
                     <Shuffle className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
@@ -260,7 +261,7 @@ const Index = () => {
                         <button
                           className="w-8 h-8 rounded-full border"
                           style={{ backgroundColor: recentColor }}
-                          onClick={() => setColor(recentColor)}
+                          onClick={() => { setColor(recentColor); setIsRandom(false); }}
                           aria-label={`Select color ${recentColor}`}
                         />
                       </TooltipTrigger>
@@ -332,6 +333,7 @@ const Index = () => {
                   key={icon.slug} 
                   icon={icon} 
                   color={color} 
+                  isRandom={isRandom}
                   resolution={resolution} // Passing resolution
                   isSelected={selectedIcons.has(icon.slug)}
                   onSelect={handleSelectIcon}
@@ -387,6 +389,7 @@ const Index = () => {
         selectedIcons={selectedIcons}
         allIcons={iconList}
         color={color}
+        isRandom={isRandom}
         resolution={resolution} // Passing resolution
         onClear={() => setSelectedIcons(new Set())}
         onRemoveIcon={handleSelectIcon}

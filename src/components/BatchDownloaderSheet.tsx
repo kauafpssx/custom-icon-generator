@@ -18,16 +18,19 @@ import { SelectedIconItem } from './SelectedIconItem';
 import { DownloadFormatDialog, DownloadFormat } from './DownloadFormatDialog';
 import { svgToPng, svgToIco } from '@/lib/image-converter';
 
+const getRandomColor = () => `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
+
 interface BatchDownloaderSheetProps {
   selectedIcons: Set<string>;
   allIcons: IconData[];
   color: string;
+  isRandom: boolean;
   resolution: number; // Nova propriedade
   onClear: () => void;
   onRemoveIcon: (slug: string) => void;
 }
 
-export const BatchDownloaderSheet: React.FC<BatchDownloaderSheetProps> = ({ selectedIcons, allIcons, color, resolution, onClear, onRemoveIcon }) => {
+export const BatchDownloaderSheet: React.FC<BatchDownloaderSheetProps> = ({ selectedIcons, allIcons, color, isRandom, resolution, onClear, onRemoveIcon }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -45,7 +48,8 @@ export const BatchDownloaderSheet: React.FC<BatchDownloaderSheetProps> = ({ sele
           const response = await fetch(`https://cdn.simpleicons.org/${icon.slug}`);
           if (!response.ok) return;
           const svgText = await response.text();
-          const cleanColor = color.substring(1);
+          const effectiveColor = isRandom ? getRandomColor() : color;
+          const cleanColor = effectiveColor.substring(1);
           const fileName = `${icon.slug}-${cleanColor}.${format}`;
 
           let fileContent: Blob | string;
@@ -53,13 +57,13 @@ export const BatchDownloaderSheet: React.FC<BatchDownloaderSheetProps> = ({ sele
           if (format === 'svg') {
             const parser = new DOMParser();
             const doc = parser.parseFromString(svgText, "image/svg+xml");
-            doc.documentElement.setAttribute('fill', color);
+            doc.documentElement.setAttribute('fill', effectiveColor);
             const serializer = new XMLSerializer();
             fileContent = serializer.serializeToString(doc.documentElement);
           } else if (format === 'png') {
-            fileContent = await svgToPng(svgText, resolution, color); // Usando a resolução
+            fileContent = await svgToPng(svgText, resolution, effectiveColor); // Usando a resolução
           } else { // ico
-            fileContent = await svgToIco(svgText, color);
+            fileContent = await svgToIco(svgText, effectiveColor);
           }
           
           zip.file(fileName, fileContent);

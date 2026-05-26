@@ -13,9 +13,12 @@ interface IconData {
   slug: string;
 }
 
+const getRandomColor = () => `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
+
 interface IconCardProps {
   icon: IconData;
   color: string;
+  isRandom: boolean;
   resolution: number; // Nova propriedade
   isSelected: boolean;
   onSelect: (slug: string) => void;
@@ -23,7 +26,7 @@ interface IconCardProps {
 
 const svgCache = new Map<string, string>();
 
-export const IconCard: React.FC<IconCardProps> = ({ icon, color, resolution, isSelected, onSelect }) => {
+export const IconCard: React.FC<IconCardProps> = ({ icon, color, isRandom, resolution, isSelected, onSelect }) => {
   const [svgContent, setSvgContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isTruncated, setIsTruncated] = useState(false);
@@ -91,7 +94,8 @@ export const IconCard: React.FC<IconCardProps> = ({ icon, color, resolution, isS
       return;
     }
 
-    const cleanColor = color.substring(1);
+    const effectiveColor = isRandom ? getRandomColor() : color;
+    const cleanColor = effectiveColor.substring(1);
     const fileName = `${icon.slug}-${cleanColor}.${format}`;
 
     try {
@@ -99,16 +103,16 @@ export const IconCard: React.FC<IconCardProps> = ({ icon, color, resolution, isS
       if (format === 'svg') {
         const parser = new DOMParser();
         const doc = parser.parseFromString(svgContent, "image/svg+xml");
-        doc.documentElement.setAttribute('fill', color);
+        doc.documentElement.setAttribute('fill', effectiveColor);
         const serializer = new XMLSerializer();
         const coloredSvg = serializer.serializeToString(doc.documentElement);
         blob = new Blob([coloredSvg], { type: 'image/svg+xml;charset=utf-8' });
       } else if (format === 'png') {
         // PNG uses resolution
-        blob = await svgToPng(svgContent, resolution, color); 
+        blob = await svgToPng(svgContent, resolution, effectiveColor); 
       } else { // ico
         // ICO uses resolution (although the internal function may generate multiple)
-        blob = await svgToIco(svgContent, color);
+        blob = await svgToIco(svgContent, effectiveColor);
       }
       
       const url = URL.createObjectURL(blob);
